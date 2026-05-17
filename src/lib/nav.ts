@@ -3,7 +3,6 @@ import {
   LayoutDashboard,
   Calendar,
   Users,
-  FileText,
   Settings,
   GraduationCap,
   ClipboardList,
@@ -33,10 +32,10 @@ export function navForTenantType(type: TenantType, slug = ":slug"): NavItem[] {
     case "COACH":
       return [
         { label: "Dashboard", href: `${base}/dashboard`, icon: LayoutDashboard },
+        { label: "Services", href: `${base}/programs`, icon: GraduationCap },
         { label: "Bookings", href: `${base}/bookings`, icon: ClipboardList },
         { label: "Schedule", href: `${base}/schedule`, icon: Calendar },
         { label: "Players", href: `${base}/roster`, icon: Users },
-        { label: "Notes", href: `${base}/notes`, icon: FileText },
         { label: "Settings", href: `${base}/settings`, icon: Settings },
       ];
     case "INSTITUTION":

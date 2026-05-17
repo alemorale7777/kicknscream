@@ -6,10 +6,10 @@ describe("navForTenantType", () => {
     const items = navForTenantType("COACH");
     expect(items.map((i) => i.label)).toEqual([
       "Dashboard",
+      "Services",
       "Bookings",
       "Schedule",
       "Players",
-      "Notes",
       "Settings",
     ]);
   });
@@ -17,6 +17,11 @@ describe("navForTenantType", () => {
   it("coach Players nav routes to /roster (shared with institution/club)", () => {
     const items = navForTenantType("COACH", "alej");
     expect(items.find((i) => i.label === "Players")?.href).toBe("/t/alej/roster");
+  });
+
+  it("coach Services nav routes to /programs (shared with institution)", () => {
+    const items = navForTenantType("COACH", "alej");
+    expect(items.find((i) => i.label === "Services")?.href).toBe("/t/alej/programs");
   });
 
   it("returns institution nav with 9 items", () => {

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { ChalkGrid, Floodlight } from "@/components/brand/ChalkGrid";
 import { Wordmark } from "@/components/brand/Wordmark";
+import { ServiceCatalog } from "@/components/book/ServiceCatalog";
 import { EVENT_TONE } from "@/lib/eventTone";
 import { format, addDays } from "date-fns";
 import {
@@ -82,7 +83,7 @@ export default async function PublicTenantPage({
   const tenant = await db.tenant.findUnique({ where: { slug } });
   if (!tenant) notFound();
 
-  const [upcomingEvents, locations] = await Promise.all([
+  const [upcomingEvents, locations, programs] = await Promise.all([
     db.event.findMany({
       where: {
         tenantId: tenant.id,
@@ -93,6 +94,10 @@ export default async function PublicTenantPage({
       take: 5,
     }),
     db.location.findMany({ where: { tenantId: tenant.id }, orderBy: { name: "asc" } }),
+    db.program.findMany({
+      where: { tenantId: tenant.id, archived: false },
+      orderBy: [{ priceModel: "asc" }, { price: "asc" }],
+    }),
   ]);
 
   const copy = TYPE_COPY[tenant.type];
@@ -155,6 +160,23 @@ export default async function PublicTenantPage({
           </Button>
         </div>
       </section>
+
+      {/* Services / programs */}
+      {programs.length > 0 && (
+        <section className="relative z-10 px-5 lg:px-12 mt-20 max-w-5xl">
+          <div className="flex items-end justify-between mb-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-ink-500">
+                {tenant.type === "COACH" ? "Services" : "Programs"}
+              </p>
+              <h2 className="text-2xl font-bold tracking-[-0.02em] mt-1">
+                {tenant.type === "COACH" ? "Book a session" : "What's open"}
+              </h2>
+            </div>
+          </div>
+          <ServiceCatalog programs={programs} tenantSlug={tenant.slug} variant="full" />
+        </section>
+      )}
 
       {/* Locations strip */}
       {locations.length > 0 && (
