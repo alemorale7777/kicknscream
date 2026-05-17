@@ -5,7 +5,7 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: true,
-    include: ["src/tests/**/*.test.ts"],
+    include: ["src/tests/**/*.test.ts", "src/lib/**/*.test.ts", "src/components/**/*.test.{ts,tsx}"],
     env: {
       // Test-only stubs so server modules load without throwing.
       // Real values come from .env.local at dev/build time.
