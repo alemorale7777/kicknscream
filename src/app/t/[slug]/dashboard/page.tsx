@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { ChalkGrid } from "@/components/brand/ChalkGrid";
 import { TodayWidget } from "@/components/dashboard/TodayWidget";
 import { ParentDashboard } from "@/components/dashboard/ParentDashboard";
+import { Sparkline, DeltaChip } from "@/components/dashboard/Sparkline";
+import { NeedsAttention, type AttentionItem } from "@/components/dashboard/NeedsAttention";
 import { NEXT_STEP_BY_TYPE } from "@/lib/nav";
 import Link from "next/link";
 import {
@@ -17,7 +19,7 @@ import {
   Wallet,
   FileText,
 } from "lucide-react";
-import { startOfDay, endOfDay, addDays } from "date-fns";
+import { startOfDay, endOfDay, addDays, subDays, eachDayOfInterval, isSameDay } from "date-fns";
 import { formatCents } from "@/lib/utils";
 import type { TenantType, Tenant, User } from "@prisma/client";
 
@@ -63,7 +65,20 @@ async function renderOperatorDashboard(
   const dayEnd = endOfDay(now);
   const weekEnd = addDays(now, 7);
 
-  const [todayEvents, weekEventsCount, playerCount, openInvoicesAgg] = await Promise.all([
+  const sevenDaysAgo = subDays(now, 7);
+  const fourteenDaysAgo = subDays(now, 14);
+
+  const [
+    todayEvents,
+    weekEventsCount,
+    playerCount,
+    openInvoicesAgg,
+    playersForSpark,
+    eventsForSpark,
+    invoicesForSpark,
+    pendingEnrollments,
+    overdueInvoices,
+  ] = await Promise.all([
     db.event.findMany({
       where: { tenantId: tenant.id, startsAt: { gte: dayStart, lte: dayEnd } },
       include: { location: true },
@@ -81,11 +96,105 @@ async function renderOperatorDashboard(
         status: { in: ["SENT", "PARTIAL", "OVERDUE"] },
       },
     }),
+    // 14-day windows for sparklines + WoW deltas — using enrollments as a
+    // proxy for "new players" growth since Player doesn't track createdAt.
+    db.enrollment.findMany({
+      where: { player: { tenantId: tenant.id }, createdAt: { gte: fourteenDaysAgo } },
+      select: { createdAt: true },
+    }),
+    db.event.findMany({
+      where: { tenantId: tenant.id, startsAt: { gte: fourteenDaysAgo } },
+      select: { startsAt: true },
+    }),
+    db.invoice.findMany({
+      where: { tenantId: tenant.id, createdAt: { gte: fourteenDaysAgo } },
+      select: { createdAt: true, amount: true, status: true },
+    }),
+    // Needs-attention queries
+    db.enrollment.findMany({
+      where: { player: { tenantId: tenant.id }, status: "PENDING" },
+      take: 5,
+      orderBy: { createdAt: "desc" },
+      include: { player: true, program: true },
+    }),
+    db.invoice.findMany({
+      where: { tenantId: tenant.id, status: "OVERDUE" },
+      take: 5,
+      orderBy: { createdAt: "asc" },
+    }),
   ]);
 
   const firstName = user.name?.split(" ")[0] ?? "Coach";
   const outstandingCents = openInvoicesAgg._sum.amount ?? 0;
   const outstandingCount = openInvoicesAgg._count;
+
+  // Build 7-day spark arrays + WoW deltas
+  const days7 = eachDayOfInterval({ start: subDays(now, 6), end: now });
+  const days14Prior = eachDayOfInterval({ start: subDays(now, 13), end: subDays(now, 7) });
+
+  function countsByDay(items: { createdAt: Date }[], days: Date[]) {
+    return days.map((d) => items.filter((it) => isSameDay(it.createdAt, d)).length);
+  }
+  function countsByStartsAt(items: { startsAt: Date }[], days: Date[]) {
+    return days.map((d) => items.filter((it) => isSameDay(it.startsAt, d)).length);
+  }
+  function sumByDay(
+    items: { createdAt: Date; amount: number; status: string }[],
+    days: Date[],
+    statuses: string[]
+  ) {
+    return days.map((d) =>
+      items
+        .filter((it) => isSameDay(it.createdAt, d) && statuses.includes(it.status))
+        .reduce((acc, it) => acc + it.amount, 0)
+    );
+  }
+
+  const rosterSpark = countsByDay(playersForSpark, days7);
+  const rosterPrior = countsByDay(playersForSpark, days14Prior).reduce((a, b) => a + b, 0);
+  const rosterCurrent = rosterSpark.reduce((a, b) => a + b, 0);
+
+  const eventsSpark = countsByStartsAt(eventsForSpark, days7);
+  const eventsPrior = countsByStartsAt(eventsForSpark, days14Prior).reduce((a, b) => a + b, 0);
+  const eventsCurrent = eventsSpark.reduce((a, b) => a + b, 0);
+
+  const outstandingSpark = sumByDay(invoicesForSpark, days7, ["SENT", "PARTIAL", "OVERDUE"]);
+  const outstandingPrior = sumByDay(invoicesForSpark, days14Prior, [
+    "SENT",
+    "PARTIAL",
+    "OVERDUE",
+  ]).reduce((a, b) => a + b, 0);
+  const outstandingCurrent = outstandingSpark.reduce((a, b) => a + b, 0);
+
+  function deltaPct(curr: number, prior: number): number | null {
+    if (prior === 0) return curr === 0 ? 0 : null;
+    return ((curr - prior) / prior) * 100;
+  }
+
+  // Build needs-attention list
+  const attentionItems: AttentionItem[] = [];
+  for (const e of pendingEnrollments) {
+    attentionItems.push({
+      id: `enrollment:${e.id}`,
+      icon: "clock",
+      tone: "warn",
+      title: `Confirm ${e.player.firstName} ${e.player.lastName}`,
+      detail: `Pending in ${e.program.name}`,
+      href: `/t/${tenant.slug}/bookings`,
+      cta: "Review",
+    });
+  }
+  for (const inv of overdueInvoices) {
+    attentionItems.push({
+      id: `invoice:${inv.id}`,
+      icon: "money",
+      tone: "danger",
+      title: `Overdue · ${formatCents(inv.amount)}`,
+      detail: inv.payerEmail,
+      href: `/t/${tenant.slug}/payments`,
+      cta: "Chase",
+    });
+  }
 
   return (
     <div className="max-w-6xl space-y-8">
@@ -107,6 +216,8 @@ async function renderOperatorDashboard(
       </header>
 
       <TodayWidget tenantSlug={tenant.slug} events={todayEvents} />
+
+      <NeedsAttention items={attentionItems} />
 
       {playerCount === 0 && (
         <Card className="relative overflow-hidden">
@@ -138,8 +249,14 @@ async function renderOperatorDashboard(
           icon={UsersIcon}
           label="Roster"
           value={playerCount.toString()}
-          sublabel={playerCount === 0 ? "No players yet" : `${playerCount === 1 ? "player" : "players"} registered`}
+          sublabel={
+            playerCount === 0
+              ? "No players yet"
+              : `${playerCount === 1 ? "player" : "players"} registered`
+          }
           href={`/t/${tenant.slug}/roster`}
+          spark={rosterSpark}
+          deltaPct={deltaPct(rosterCurrent, rosterPrior)}
         />
         <StatCard
           icon={FileText}
@@ -147,6 +264,8 @@ async function renderOperatorDashboard(
           value={weekEventsCount.toString()}
           sublabel={weekEventsCount === 0 ? "No events scheduled" : "events upcoming"}
           href={`/t/${tenant.slug}/schedule`}
+          spark={eventsSpark}
+          deltaPct={deltaPct(eventsCurrent, eventsPrior)}
         />
         <StatCard
           icon={Wallet}
@@ -159,6 +278,8 @@ async function renderOperatorDashboard(
           }
           href={`/t/${tenant.slug}/payments`}
           tone={outstandingCents > 0 ? "warn" : "default"}
+          spark={outstandingSpark.map((c) => c / 100)}
+          deltaPct={deltaPct(outstandingCurrent, outstandingPrior)}
         />
       </section>
 
@@ -271,6 +392,8 @@ function StatCard({
   sublabel,
   href,
   tone = "default",
+  spark,
+  deltaPct,
 }: {
   icon: typeof UsersIcon;
   label: string;
@@ -278,16 +401,29 @@ function StatCard({
   sublabel: string;
   href?: string;
   tone?: "default" | "warn";
+  spark?: number[];
+  deltaPct?: number | null;
 }) {
   const valueColor = tone === "warn" ? "text-warn" : "";
+  const sparkStroke = tone === "warn" ? "var(--color-warn)" : "var(--color-turf-400)";
   const inner = (
     <CardContent className="p-5">
       <div className="flex items-start justify-between mb-3">
         <p className="text-xs uppercase tracking-wider text-ink-500">{label}</p>
         <Icon className="h-4 w-4 text-ink-700" />
       </div>
-      <p className={`text-3xl font-bold font-mono tracking-tight ${valueColor}`}>{value}</p>
-      <p className="text-xs text-ink-500 mt-1.5">{sublabel}</p>
+      <div className="flex items-baseline gap-2 flex-wrap">
+        <p className={`text-3xl font-bold font-mono tracking-tight ${valueColor}`}>{value}</p>
+        {deltaPct !== undefined && <DeltaChip pct={deltaPct ?? null} />}
+      </div>
+      <div className="flex items-center justify-between gap-2 mt-1.5">
+        <p className="text-xs text-ink-500 truncate">{sublabel}</p>
+        {spark && spark.length > 0 && (
+          <div className="shrink-0">
+            <Sparkline values={spark} width={64} height={20} stroke={sparkStroke} fill={sparkStroke} />
+          </div>
+        )}
+      </div>
     </CardContent>
   );
   if (href) {
