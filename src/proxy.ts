@@ -8,6 +8,11 @@ import { auth } from "@/lib/auth";
  * Anything under /t/[slug]/* or /onboarding requires a session.
  * Unauthed users get bounced to /auth/signin with the original URL
  * preserved as ?callbackUrl=.
+ *
+ * Note: legacy URL → portal URL 308 redirects are wired in a later PR,
+ * after the new (coach)/(family)/(admin) routes actually exist. The helper
+ * `legacyRedirectPath` is already exported from `@/lib/auth/portal` and
+ * ready to flip on.
  */
 export default auth((req) => {
   const { nextUrl } = req;
