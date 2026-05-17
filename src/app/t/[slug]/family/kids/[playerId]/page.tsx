@@ -1,0 +1,163 @@
+import { requireTenant } from "@/lib/tenant";
+import { db } from "@/lib/db";
+import { notFound } from "next/navigation";
+import Link from "next/link";
+import { Card, CardContent } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Markdown } from "@/components/schedule/Markdown";
+import { format, differenceInYears } from "date-fns";
+import { getInitials } from "@/lib/utils";
+import { ArrowLeft, Calendar, CheckCircle2 } from "lucide-react";
+
+export const metadata = { title: "Player" };
+
+export default async function FamilyKidPage({
+  params,
+}: {
+  params: Promise<{ slug: string; playerId: string }>;
+}) {
+  const { slug, playerId } = await params;
+  const { tenant, user } = await requireTenant(slug);
+
+  const player = await db.player.findUnique({ where: { id: playerId } });
+  // Strict parent-link check — 404 if not the parent
+  if (!player || player.tenantId !== tenant.id || player.parentId !== user.id) {
+    notFound();
+  }
+
+  const [attendances, sessionNotes, upcomingEvents] = await Promise.all([
+    db.attendance.findMany({
+      where: { playerId: player.id },
+      include: { event: true },
+      orderBy: { event: { startsAt: "desc" } },
+    }),
+    db.sessionNote.findMany({
+      where: { playerId: player.id, visibleToParent: true },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+    }),
+    db.event.findMany({
+      where: {
+        tenantId: tenant.id,
+        startsAt: { gte: new Date() },
+        title: { contains: `${player.firstName} ${player.lastName}` },
+      },
+      include: { location: true },
+      orderBy: { startsAt: "asc" },
+      take: 10,
+    }),
+  ]);
+
+  const age = differenceInYears(new Date(), player.dob);
+  const present = attendances.filter(
+    (a) => a.status === "PRESENT" || a.status === "LATE"
+  ).length;
+  const attendancePct =
+    attendances.length === 0 ? null : Math.round((present / attendances.length) * 100);
+
+  return (
+    <div className="space-y-6">
+      <Link
+        href={`/t/${tenant.slug}/family/home`}
+        className="inline-flex items-center gap-1 text-xs text-ink-500 hover:text-ink-300"
+      >
+        <ArrowLeft className="h-3 w-3" /> Back home
+      </Link>
+
+      <Card>
+        <CardContent className="p-5 flex items-center gap-4">
+          <Avatar className="h-14 w-14 shrink-0">
+            {player.photoUrl && <AvatarImage src={player.photoUrl} alt="" />}
+            <AvatarFallback className="text-base">
+              {getInitials(`${player.firstName} ${player.lastName}`)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl font-bold tracking-[-0.02em]">
+              {player.firstName} {player.lastName}
+            </h1>
+            <p className="text-sm text-ink-500 font-mono">age {age}</p>
+          </div>
+          {attendancePct !== null && (
+            <div className="text-right">
+              <p className="text-[10px] uppercase tracking-wider text-ink-500">Attendance</p>
+              <p className="font-mono text-lg font-semibold text-turf-300">{attendancePct}%</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <section className="space-y-2">
+        <h2 className="text-sm uppercase tracking-[0.2em] text-ink-500">Upcoming sessions</h2>
+        {upcomingEvents.length === 0 ? (
+          <Card className="p-6 text-center border-dashed">
+            <Calendar className="h-7 w-7 text-ink-700 mx-auto mb-2" />
+            <p className="text-sm text-ink-300">No upcoming sessions</p>
+            <Button variant="primary" size="sm" asChild className="mt-3">
+              <Link href={`/t/${tenant.slug}/family/book`}>Book a session</Link>
+            </Button>
+          </Card>
+        ) : (
+          upcomingEvents.map((ev) => (
+            <Card key={ev.id} className="p-3 flex items-center gap-3">
+              <span className="text-xs font-mono text-ink-300 shrink-0 w-32">
+                {format(ev.startsAt, "MMM d · h:mm a")}
+              </span>
+              <span className="font-medium text-ink-50 truncate flex-1">{ev.title}</span>
+              {ev.location && (
+                <span className="text-xs text-ink-500 truncate hidden sm:inline">
+                  {ev.location.name}
+                </span>
+              )}
+            </Card>
+          ))
+        )}
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="text-sm uppercase tracking-[0.2em] text-ink-500">Recent attendance</h2>
+        {attendances.length === 0 ? (
+          <Card className="p-6 text-center border-dashed">
+            <CheckCircle2 className="h-7 w-7 text-ink-700 mx-auto mb-2" />
+            <p className="text-sm text-ink-300">No attendance recorded yet</p>
+          </Card>
+        ) : (
+          attendances.slice(0, 8).map((a) => (
+            <Card key={a.id} className="p-3 flex items-center gap-3">
+              <span className="text-xs font-mono text-ink-300 shrink-0 w-32">
+                {format(a.event.startsAt, "MMM d")}
+              </span>
+              <span className="font-medium text-ink-50 truncate flex-1">{a.event.title}</span>
+              <Badge
+                variant={
+                  a.status === "PRESENT" ? "turf" : a.status === "LATE" ? "outline" : "danger"
+                }
+                className="text-[10px]"
+              >
+                {a.status.toLowerCase()}
+              </Badge>
+            </Card>
+          ))
+        )}
+      </section>
+
+      {sessionNotes.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-sm uppercase tracking-[0.2em] text-ink-500">Coach notes</h2>
+          {sessionNotes.map((n) => (
+            <Card key={n.id} className="p-4">
+              <div className="flex items-baseline justify-end gap-2 mb-2">
+                <span className="text-xs font-mono text-ink-500">
+                  {format(n.createdAt, "MMM d, yyyy")}
+                </span>
+              </div>
+              <Markdown>{n.content}</Markdown>
+            </Card>
+          ))}
+        </section>
+      )}
+    </div>
+  );
+}
