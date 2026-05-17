@@ -1,19 +1,29 @@
 import Link from "next/link";
 import { Wordmark } from "@/components/brand/Wordmark";
-import { TenantSwitcher } from "./TenantSwitcher";
+import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import { UserMenu } from "./UserMenu";
+import { CommandMenuTrigger } from "./CommandMenuTrigger";
 import { getCurrentUser } from "@/lib/tenant";
 import { Separator } from "@/components/ui/separator";
-import type { Tenant, User } from "@prisma/client";
+import type { Tenant, User, Role } from "@prisma/client";
 
-export async function TopNav({ tenant, user }: { tenant: Tenant; user: User }) {
+export async function TopNav({
+  tenant,
+  user,
+  currentRole,
+}: {
+  tenant: Tenant;
+  user: User;
+  currentRole: Role;
+}) {
   const fullUser = await getCurrentUser();
-  const available =
+  const workspaces =
     fullUser?.memberships.map((m) => ({
       id: m.tenant.id,
       slug: m.tenant.slug,
       name: m.tenant.name,
       type: m.tenant.type,
+      role: m.role,
     })) ?? [];
 
   return (
@@ -28,13 +38,20 @@ export async function TopNav({ tenant, user }: { tenant: Tenant; user: User }) {
             <Wordmark size="sm" />
           </Link>
           <Separator orientation="vertical" className="h-6 hidden sm:block" />
-          <TenantSwitcher
-            current={{ id: tenant.id, slug: tenant.slug, name: tenant.name, type: tenant.type }}
-            available={available}
+          <WorkspaceSwitcher
+            current={{
+              id: tenant.id,
+              slug: tenant.slug,
+              name: tenant.name,
+              type: tenant.type,
+              role: currentRole,
+            }}
+            workspaces={workspaces}
           />
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <CommandMenuTrigger tenantSlug={tenant.slug} tenantType={tenant.type} />
           <UserMenu user={user} />
         </div>
       </div>

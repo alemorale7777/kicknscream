@@ -81,25 +81,35 @@ enum Role {
 }
 
 model Tenant {
-  id              String         @id @default(cuid())
-  slug            String         @unique
-  name            String
-  type            TenantType
-  logoUrl         String?
-  primaryColor    String?
-  stripeAccountId String?
-  subscription    Subscription?
-  memberships     Membership[]
-  locations       Location[]
-  programs        Program[]
-  players         Player[]
-  events          Event[]
-  invoices        Invoice[]
-  waivers         Waiver[]
-  invitations     Invitation[]
-  tryouts         TryoutSignup[]
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  id                      String                @id @default(cuid())
+  slug                    String                @unique
+  name                    String
+  type                    TenantType
+  logoUrl                 String?
+  primaryColor            String?
+  stripeAccountId         String?
+  // KYC mirror columns kept fresh by the account.updated webhook
+  stripeChargesEnabled    Boolean               @default(false)
+  stripePayoutsEnabled    Boolean               @default(false)
+  stripeDetailsSubmitted  Boolean               @default(false)
+  stripeRequirementsDueAt DateTime?
+  subscription            Subscription?
+  memberships             Membership[]
+  locations               Location[]
+  programs                Program[]
+  players                 Player[]
+  events                  Event[]
+  invoices                Invoice[]
+  waivers                 Waiver[]
+  invitations             Invitation[]
+  tryouts                 TryoutSignup[]
+  threads                 Thread[]
+  messages                Message[]
+  files                   File[]
+  auditEntries            AuditLog[]
+  permissionsOverrides    PermissionsOverride[]
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
 }
 
 model Membership {
@@ -161,21 +171,36 @@ enum PriceModel {
   FREE
 }
 
+enum ServiceType {
+  SINGLE
+  PACK
+  MEMBERSHIP
+  PROGRAM
+}
+
 model Program {
-  id          String       @id @default(cuid())
-  tenantId    String
-  name        String
-  description String?
-  ageMin      Int?
-  ageMax      Int?
-  skillLevel  SkillLevel?
-  price       Int // in cents
-  priceModel  PriceModel
-  capacity    Int?
-  archived    Boolean      @default(false)
-  events      Event[]
-  enrollments Enrollment[]
-  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id                String       @id @default(cuid())
+  tenantId          String
+  name              String
+  description       String?
+  ageMin            Int?
+  ageMax            Int?
+  skillLevel        SkillLevel?
+  price             Int // in cents
+  priceModel        PriceModel
+  capacity          Int?
+  archived          Boolean      @default(false)
+  // Phase B service product additions
+  type              ServiceType?
+  packSize          Int?
+  recurringInterval String?
+  cohortStart       DateTime?
+  cohortEnd         DateTime?
+  bookingLinkToken  String?      @unique
+  thumbnailUrl      String?
+  events            Event[]
+  enrollments       Enrollment[]
+  tenant            Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
 }
@@ -217,16 +242,38 @@ model Player {
   lastName         String
   dob              DateTime
   parentId         String?
+  // Legacy single-position field (kept for compat); use positions[] for new code
   position         String?
+  positions        String[]          @default([])
+  skillTags        String[]          @default([])
+  photoUrl         String?
+  notesPrivate     String?
   jerseyNumber     Int?
   notes            String?
   enrollments      Enrollment[]
   attendances      Attendance[]
   developmentNotes DevelopmentNote[]
   waiverSignatures WaiverSignature[]
+  parentLinks      ParentPlayer[]
+  files            File[]
   tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
+}
+
+// Many-to-many parent ↔ player. The Player.parentId field stays as the
+// primary parent for compat with existing code; ParentPlayer represents
+// additional guardians (co-parent, grandparent, etc.).
+model ParentPlayer {
+  id           String   @id @default(cuid())
+  parentUserId String
+  playerId     String
+  relationship String   @default("parent")
+  createdAt    DateTime @default(now())
+  player       Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([parentUserId, playerId])
+  @@index([parentUserId])
 }
 
 enum EnrollmentStatus {
@@ -235,21 +282,32 @@ enum EnrollmentStatus {
   WAITLIST
   CANCELED
   COMPLETED
+  // Added in Phase B
+  CONFIRMED
+  PAID
+  ATTENDED
+  NO_SHOW
+  REFUNDED
 }
 
 model Enrollment {
-  id        String           @id @default(cuid())
-  playerId  String
-  programId String
-  status    EnrollmentStatus
-  invoiceId String?
-  player    Player           @relation(fields: [playerId], references: [id], onDelete: Cascade)
-  program   Program          @relation(fields: [programId], references: [id])
-  invoice   Invoice?         @relation(fields: [invoiceId], references: [id])
-  createdAt DateTime         @default(now())
+  id                 String           @id @default(cuid())
+  playerId           String
+  programId          String
+  status             EnrollmentStatus
+  invoiceId          String?
+  attendedAt         DateTime?
+  cancellationReason String?
+  recurringSeriesId  String?
+  packBalance        Int?
+  player             Player           @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  program            Program          @relation(fields: [programId], references: [id])
+  invoice            Invoice?         @relation(fields: [invoiceId], references: [id])
+  createdAt          DateTime         @default(now())
 
   @@index([programId])
   @@index([playerId])
+  @@index([recurringSeriesId])
 }
 
 enum AttendanceStatus {
@@ -426,4 +484,130 @@ model TryoutSignup {
   tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, status])
+}
+
+// =====================================================================
+// PHASE B — MESSAGING, FILES, AUDIT, PERMISSIONS, IDEMPOTENCY, PREFS
+// =====================================================================
+
+enum MessageChannel {
+  IN_APP
+  EMAIL
+  SMS
+}
+
+model Thread {
+  id             String    @id @default(cuid())
+  tenantId       String
+  subject        String?
+  participantIds String[]
+  lastMessageAt  DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+  messages       Message[]
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, lastMessageAt(sort: Desc)])
+}
+
+model Message {
+  id           String         @id @default(cuid())
+  tenantId     String
+  threadId     String
+  senderUserId String
+  body         String
+  channel      MessageChannel @default(IN_APP)
+  deliveredAt  DateTime?
+  readAt       DateTime?
+  createdAt    DateTime       @default(now())
+  thread       Thread         @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  tenant       Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, createdAt(sort: Desc)])
+  @@index([tenantId])
+}
+
+enum FileKind {
+  WAIVER
+  MEDICAL
+  PHOTO
+  DOC
+}
+
+model File {
+  id          String    @id @default(cuid())
+  tenantId    String
+  ownerUserId String?
+  playerId    String?
+  kind        FileKind
+  url         String
+  filename    String?
+  signedAt    DateTime?
+  createdAt   DateTime  @default(now())
+  player      Player?   @relation(fields: [playerId], references: [id], onDelete: SetNull)
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, kind])
+  @@index([playerId])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  tenantId    String
+  actorUserId String?
+  action      String
+  targetType  String?
+  targetId    String?
+  diff        Json?
+  createdAt   DateTime @default(now())
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@index([targetType, targetId])
+}
+
+enum PermissionLevel {
+  NONE
+  VIEW
+  EDIT
+}
+
+model PermissionsOverride {
+  id        String          @id @default(cuid())
+  tenantId  String
+  role      Role
+  feature   String
+  level     PermissionLevel
+  updatedAt DateTime        @updatedAt
+  tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, role, feature])
+}
+
+// Stripe webhook idempotency — Stripe retries aggressively; we log every
+// event ID we've processed so retries become no-ops.
+model StripeWebhookEvent {
+  id          String   @id @default(cuid())
+  stripeId    String   @unique
+  type        String
+  processedAt DateTime @default(now())
+  payload     Json?
+
+  @@index([type])
+}
+
+model UserPreferences {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  theme          String? // 'dark' | 'light' | 'system'
+  emailReminders Boolean  @default(true)
+  emailPayments  Boolean  @default(true)
+  emailMessages  Boolean  @default(true)
+  pushReminders  Boolean  @default(true)
+  pushPayments   Boolean  @default(true)
+  pushMessages   Boolean  @default(true)
+  smsOptIn       Boolean  @default(false)
+  smsReminders   Boolean  @default(false)
+  smsPayments    Boolean  @default(false)
+  updatedAt      DateTime @updatedAt
+  createdAt      DateTime @default(now())
 }

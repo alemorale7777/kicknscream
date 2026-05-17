@@ -15,7 +15,7 @@ export default async function TenantLayout({
 
   return (
     <div className="min-h-screen bg-pitch-900 text-ink-50">
-      <TopNav tenant={tenant} user={user} />
+      <TopNav tenant={tenant} user={user} currentRole={membership.role} />
       <div className="flex">
         <SideNav tenant={tenant} role={membership.role} />
         <main className="flex-1 min-h-[calc(100vh-64px)] p-5 lg:p-10">
