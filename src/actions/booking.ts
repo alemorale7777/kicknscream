@@ -165,6 +165,7 @@ export async function createBookingAction(input: BookingInput) {
       payment_intent_data: {
         application_fee_amount: 0,
         transfer_data: { destination: tenant.stripeAccountId },
+        on_behalf_of: tenant.stripeAccountId,
         metadata: {
           tenantId: tenant.id,
           invoiceId: invoice.id,
