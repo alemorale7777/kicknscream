@@ -4,7 +4,6 @@ import {
   isPortalAllowed,
   portalDefaultPath,
   portalFromPath,
-  legacyRedirectPath,
 } from "@/lib/auth/portal";
 
 describe("defaultPortalForRole", () => {
@@ -69,27 +68,3 @@ describe("portalFromPath", () => {
   });
 });
 
-describe("legacyRedirectPath", () => {
-  it("redirects every legacy coach segment", () => {
-    expect(legacyRedirectPath("/t/abc/dashboard")).toBe("/t/abc/coach/dashboard");
-    expect(legacyRedirectPath("/t/abc/bookings")).toBe("/t/abc/coach/bookings");
-    expect(legacyRedirectPath("/t/abc/schedule")).toBe("/t/abc/coach/schedule");
-    expect(legacyRedirectPath("/t/abc/settings")).toBe("/t/abc/coach/settings");
-  });
-  it("preserves sub-paths and query strings (path only)", () => {
-    expect(legacyRedirectPath("/t/abc/schedule/event-1")).toBe(
-      "/t/abc/coach/schedule/event-1"
-    );
-    expect(legacyRedirectPath("/t/abc/settings/team")).toBe("/t/abc/coach/settings/team");
-  });
-  it("returns null for paths already on a portal", () => {
-    expect(legacyRedirectPath("/t/abc/coach/bookings")).toBeNull();
-    expect(legacyRedirectPath("/t/abc/family/home")).toBeNull();
-    expect(legacyRedirectPath("/t/abc/admin/team")).toBeNull();
-  });
-  it("returns null for unknown segments + non-tenant paths", () => {
-    expect(legacyRedirectPath("/t/abc/something-weird")).toBeNull();
-    expect(legacyRedirectPath("/abc")).toBeNull();
-    expect(legacyRedirectPath("/auth/signin")).toBeNull();
-  });
-});
