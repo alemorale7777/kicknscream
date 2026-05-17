@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -35,11 +36,13 @@ type PlayerWithParent = Player & { parent?: User | null };
 
 export function RosterList({
   tenantId,
+  tenantSlug,
   players,
   canEdit,
   showClubFields,
 }: {
   tenantId: string;
+  tenantSlug: string;
   players: PlayerWithParent[];
   canEdit: boolean;
   showClubFields: boolean;
@@ -147,7 +150,7 @@ export function RosterList({
                     <AvatarFallback>{getInitials(`${p.firstName} ${p.lastName}`)}</AvatarFallback>
                   </Avatar>
 
-                  <div className="flex-1 min-w-0">
+                  <Link href={`/t/${tenantSlug}/roster/${p.id}`} className="flex-1 min-w-0 block group/link">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold text-ink-50 truncate">
                         {p.firstName} {p.lastName}
@@ -178,7 +181,7 @@ export function RosterList({
                         </>
                       )}
                     </div>
-                  </div>
+                  </Link>
 
                   {canEdit && (
                     <DropdownMenu>

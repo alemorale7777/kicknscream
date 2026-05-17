@@ -42,6 +42,7 @@ export default async function RosterPage({ params }: { params: Promise<{ slug: s
 
       <RosterList
         tenantId={tenant.id}
+        tenantSlug={tenant.slug}
         players={withParents}
         canEdit={canEdit}
         showClubFields={tenant.type === "CLUB"}

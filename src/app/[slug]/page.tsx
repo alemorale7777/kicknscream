@@ -105,8 +105,57 @@ export default async function PublicTenantPage({
   const Icon = copy.icon;
   const accentColor = tenant.primaryColor ?? "#1FB663";
 
+  // JSON-LD structured data — LocalBusiness + Offer per program.
+  // Helps Google Rich Results, knowledge panels, etc.
+  const baseUrl = "https://kicknscream.vercel.app";
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    "@id": `${baseUrl}/${tenant.slug}`,
+    name: tenant.name,
+    url: `${baseUrl}/${tenant.slug}`,
+    description: `${tenant.name} on KickNScream — ${copy.tagline}`,
+    image: tenant.logoUrl ?? undefined,
+    address: locations[0]?.address
+      ? {
+          "@type": "PostalAddress",
+          streetAddress: locations[0].address,
+        }
+      : undefined,
+    makesOffer: programs.map((p) => ({
+      "@type": "Offer",
+      name: p.name,
+      description: p.description ?? undefined,
+      price: (p.price / 100).toFixed(2),
+      priceCurrency: "USD",
+      url: `${baseUrl}/${tenant.slug}/book/${p.id}`,
+    })),
+  };
+
+  const faqs = faqsFor(tenant.type, tenant.name);
+
   return (
     <main className="relative min-h-screen bg-pitch-900 overflow-hidden">
+      <script
+        type="application/ld+json"
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            mainEntity: faqs.map((f) => ({
+              "@type": "Question",
+              name: f.q,
+              acceptedAnswer: { "@type": "Answer", text: f.a },
+            })),
+          }),
+        }}
+      />
       <ChalkGrid />
       <Floodlight />
 
@@ -296,6 +345,28 @@ export default async function PublicTenantPage({
         </Card>
       </section>
 
+      {/* FAQ */}
+      <section className="relative z-10 px-5 lg:px-12 mt-20 max-w-3xl">
+        <p className="text-xs uppercase tracking-[0.2em] text-ink-500 mb-2">FAQ</p>
+        <h2 className="text-3xl font-bold tracking-[-0.02em] mb-6">Common questions</h2>
+        <div className="space-y-2">
+          {faqs.map((f, i) => (
+            <details
+              key={i}
+              className="group border border-line rounded-md bg-pitch-800 overflow-hidden"
+            >
+              <summary className="cursor-pointer px-4 py-3 font-medium text-ink-50 hover:bg-pitch-700 transition-colors duration-[120ms] list-none flex items-center justify-between gap-3">
+                <span>{f.q}</span>
+                <span className="text-flood-400 text-lg leading-none transition-transform duration-[180ms] group-open:rotate-45">
+                  +
+                </span>
+              </summary>
+              <div className="px-4 pb-4 pt-1 text-sm text-ink-300 leading-relaxed">{f.a}</div>
+            </details>
+          ))}
+        </div>
+      </section>
+
       <footer className="relative z-10 mt-24 border-t border-line py-8 px-5 lg:px-12 flex justify-between items-center text-xs text-ink-500">
         <div className="flex items-center gap-3">
           <Wordmark size="sm" />
@@ -308,4 +379,55 @@ export default async function PublicTenantPage({
       </footer>
     </main>
   );
+}
+
+function faqsFor(type: TenantType, name: string): Array<{ q: string; a: string }> {
+  const shared = [
+    {
+      q: "How do I sign up?",
+      a: `Click any service or "Book a session" above, fill in your details, and you'll get a confirmation email. Payments are processed by Stripe — your card details never touch our servers.`,
+    },
+    {
+      q: "Can I cancel or reschedule?",
+      a: "Yes. Reply to your confirmation email or sign in to your parent dashboard. Refund eligibility depends on the timing — most coaches honor cancellations 24h+ before the session.",
+    },
+    {
+      q: "What ages do you work with?",
+      a: "Each program lists its age range. If you don't see your kid's age, message the coach directly — they often accommodate.",
+    },
+  ];
+  if (type === "COACH") {
+    return [
+      ...shared,
+      {
+        q: "Do you offer group sessions?",
+        a: `${name} primarily runs 1-on-1 coaching but will pair players of similar ability on request. Mention it when you book.`,
+      },
+    ];
+  }
+  if (type === "INSTITUTION") {
+    return [
+      ...shared,
+      {
+        q: "Are coaches background-checked?",
+        a: "Yes. All staff at the institution complete a background check and SafeSport (or local equivalent) certification before working with players.",
+      },
+      {
+        q: "Do you offer financial assistance?",
+        a: "We do our best to keep soccer accessible. Email the office to ask about scholarships or payment plans.",
+      },
+    ];
+  }
+  // CLUB
+  return [
+    ...shared,
+    {
+      q: "When are tryouts?",
+      a: "Tryout dates are posted on the Apply for tryouts page. Players sign up online and bring cleats, shinguards, and water.",
+    },
+    {
+      q: "What's the season commitment?",
+      a: "Most teams run August–June with breaks at major holidays. Full season fees cover league, referee, and field costs.",
+    },
+  ];
 }

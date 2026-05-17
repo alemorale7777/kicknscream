@@ -14,6 +14,7 @@ import {
 import { toast } from "sonner";
 import { ProgramDialog } from "./ProgramDialog";
 import { archiveProgramAction, deleteProgramAction } from "@/actions/program";
+import { ShareProgramDialog } from "./ShareProgramDialog";
 import { formatCents } from "@/lib/utils";
 import {
   Plus,
@@ -25,6 +26,7 @@ import {
   Loader2,
   GraduationCap,
   Users,
+  Share2,
 } from "lucide-react";
 import type { Program, PriceModel } from "@prisma/client";
 
@@ -38,11 +40,13 @@ const PRICE_MODEL_LABEL: Record<PriceModel, string> = {
 
 export function ProgramsList({
   tenantId,
+  tenantSlug,
   programs,
   canEdit,
   tenantLabel,
 }: {
   tenantId: string;
+  tenantSlug: string;
   programs: Program[];
   canEdit: boolean;
   tenantLabel: string;
@@ -50,6 +54,7 @@ export function ProgramsList({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Program | undefined>();
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [sharing, setSharing] = useState<Program | null>(null);
   const [, startTransition] = useTransition();
 
   const active = programs.filter((p) => !p.archived);
@@ -148,6 +153,7 @@ export function ProgramsList({
             onEdit={openEdit}
             onArchive={handleArchive}
             onDelete={handleDelete}
+            onShare={() => setSharing(p)}
           />
         ))}
       </div>
@@ -167,6 +173,7 @@ export function ProgramsList({
                 onEdit={openEdit}
                 onArchive={handleArchive}
                 onDelete={handleDelete}
+                onShare={() => setSharing(p)}
               />
             ))}
           </div>
@@ -182,8 +189,25 @@ export function ProgramsList({
           if (!v) setEditing(undefined);
         }}
       />
+
+      {sharing && (
+        <ShareProgramDialog
+          open={!!sharing}
+          onOpenChange={(v) => {
+            if (!v) setSharing(null);
+          }}
+          programName={sharing.name}
+          url={shareUrl(tenantSlug, sharing)}
+        />
+      )}
     </>
   );
+}
+
+function shareUrl(tenantSlug: string, program: Program): string {
+  const origin =
+    typeof window !== "undefined" ? window.location.origin : "https://kicknscream.vercel.app";
+  return `${origin}/${tenantSlug}/book/${program.id}`;
 }
 
 function ProgramCard({
@@ -193,6 +217,7 @@ function ProgramCard({
   onEdit,
   onArchive,
   onDelete,
+  onShare,
 }: {
   program: Program;
   canEdit: boolean;
@@ -200,6 +225,7 @@ function ProgramCard({
   onEdit: (p: Program) => void;
   onArchive: (p: Program, archive: boolean) => void;
   onDelete: (p: Program) => void;
+  onShare: () => void;
 }) {
   const isPending = pendingId === program.id;
   return (
@@ -260,6 +286,10 @@ function ProgramCard({
               <DropdownMenuItem onClick={() => onEdit(program)} className="cursor-pointer">
                 <Pencil className="h-4 w-4" />
                 Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onShare} className="cursor-pointer">
+                <Share2 className="h-4 w-4" />
+                Share &amp; QR
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onArchive(program, !program.archived)} className="cursor-pointer">
                 {program.archived ? (

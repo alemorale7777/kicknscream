@@ -36,7 +36,7 @@ export default async function ProgramsPage({ params }: { params: Promise<{ slug:
         </p>
       </header>
 
-      <ProgramsList tenantId={tenant.id} programs={programs} canEdit={canEdit} tenantLabel={label} />
+      <ProgramsList tenantId={tenant.id} tenantSlug={tenant.slug} programs={programs} canEdit={canEdit} tenantLabel={label} />
     </div>
   );
 }
