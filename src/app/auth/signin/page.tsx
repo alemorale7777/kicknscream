@@ -89,15 +89,7 @@ export default async function SignInPage({
         </Card>
 
         <p className="text-center text-xs text-ink-500">
-          By signing in you agree to our{" "}
-          <a href="/terms" className="text-ink-300 hover:text-ink-50 underline-offset-4 hover:underline">
-            Terms
-          </a>{" "}
-          and{" "}
-          <a href="/privacy" className="text-ink-300 hover:text-ink-50 underline-offset-4 hover:underline">
-            Privacy Policy
-          </a>
-          .
+          By signing in you agree to our terms and privacy policy.
         </p>
       </div>
     </main>
