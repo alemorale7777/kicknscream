@@ -50,35 +50,3 @@ export function portalFromPath(pathname: string): Portal | null {
   return (m?.[1] as Portal | undefined) ?? null;
 }
 
-/**
- * Legacy coach segments that existed before the route-group split. Used by
- * proxy.ts to 308-redirect old bookmarks to the new portal-scoped paths.
- */
-export const LEGACY_COACH_SEGMENTS = new Set([
-  "dashboard",
-  "bookings",
-  "schedule",
-  "roster",
-  "programs",
-  "payments",
-  "comms",
-  "tryouts",
-  "development",
-  "settings",
-]);
-
-/**
- * Legacy-URL → portal-URL mapping for 308 redirects.
- * Returns the new path for a known legacy tenant URL, or null if the path is
- * already on a portal or is a public route (no rewrite needed).
- *
- * Example: "/t/abc/bookings" → "/t/abc/coach/bookings"
- */
-export function legacyRedirectPath(pathname: string): string | null {
-  const m = pathname.match(/^\/t\/([^/]+)\/([^/]+)(\/.*)?$/);
-  if (!m) return null;
-  const [, slug, segment, rest = ""] = m;
-  if (segment === "coach" || segment === "family" || segment === "admin") return null;
-  if (!LEGACY_COACH_SEGMENTS.has(segment)) return null;
-  return `/t/${slug}/coach/${segment}${rest}`;
-}
