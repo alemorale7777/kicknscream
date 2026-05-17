@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { requireTenant } from "@/lib/tenant";
-import { TopNav } from "@/components/chrome/TopNav";
+import { FamilyShell } from "@/components/chrome/FamilyShell";
 import {
   isPortalAllowed,
   portalDefaultPath,
@@ -23,12 +23,8 @@ export default async function FamilyGroupLayout({
   }
 
   return (
-    <div className="min-h-screen bg-pitch-900 text-ink-50">
-      <TopNav tenant={tenant} user={user} currentRole={membership.role} />
-      <main className="px-4 lg:px-6 py-6 lg:py-10 pb-24 lg:pb-10 max-w-5xl mx-auto">
-        {children}
-      </main>
-      {/* FamilyBottomTabs ships in PR 2 */}
-    </div>
+    <FamilyShell tenant={tenant} user={user} role={membership.role}>
+      {children}
+    </FamilyShell>
   );
 }
