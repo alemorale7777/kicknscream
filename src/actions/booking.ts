@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { sendBookingConfirmation } from "@/lib/email";
 import { stripeEnabled, getStripe } from "@/lib/stripe";
+import { normalizeEmail, normalizePhone, matchParent } from "@/lib/parent-link";
 import type { EventType } from "@prisma/client";
 
 const bookingSchema = z.object({
@@ -49,16 +50,56 @@ export async function createBookingAction(input: BookingInput) {
   const endsAt = new Date(startsAt.getTime() + data.durationMin * 60 * 1000);
   if (startsAt < new Date()) throw new Error("Pick a time in the future");
 
-  // Upsert parent user
-  const parentEmail = data.parentEmail.toLowerCase().trim();
-  const parentUser = await db.user.upsert({
-    where: { email: parentEmail },
-    create: { email: parentEmail, name: data.parentName, phone: data.parentPhone || null },
-    update: {
-      name: data.parentName,
-      phone: data.parentPhone || undefined,
-    },
-  });
+  // Parent dedup pass — email match wins; phone fallback for same-family
+  // parents with different inboxes. Writes a ParentPlayer link row at the end
+  // so multi-guardian families are tracked.
+  const parentEmail = normalizeEmail(data.parentEmail) ?? data.parentEmail.toLowerCase().trim();
+  const normPhone = normalizePhone(data.parentPhone ?? null);
+
+  const emailMatch = await db.user.findUnique({ where: { email: parentEmail } });
+  let parentUser: { id: string; email: string | null; phone: string | null; name: string | null };
+  if (emailMatch) {
+    parentUser = await db.user.update({
+      where: { id: emailMatch.id },
+      data: {
+        name: data.parentName,
+        phone: data.parentPhone || emailMatch.phone,
+      },
+    });
+  } else if (normPhone) {
+    const candidatesByTenant = await db.user.findMany({
+      where: {
+        memberships: { some: { tenantId: tenant.id, role: "PARENT" } },
+        phone: { not: null },
+      },
+      select: { id: true, email: true, phone: true, name: true },
+      take: 200,
+    });
+    const matched = matchParent(candidatesByTenant, {
+      email: parentEmail,
+      phone: normPhone,
+    });
+    parentUser = matched
+      ? await db.user.update({
+          where: { id: matched.id },
+          data: { name: data.parentName },
+        })
+      : await db.user.create({
+          data: {
+            email: parentEmail,
+            name: data.parentName,
+            phone: data.parentPhone || null,
+          },
+        });
+  } else {
+    parentUser = await db.user.create({
+      data: {
+        email: parentEmail,
+        name: data.parentName,
+        phone: data.parentPhone || null,
+      },
+    });
+  }
 
   // Upsert parent membership (PARENT role)
   await db.membership.upsert({
@@ -89,6 +130,19 @@ export async function createBookingAction(input: BookingInput) {
       },
     });
   }
+
+  // Track parent ↔ player link (multi-guardian families)
+  await db.parentPlayer.upsert({
+    where: {
+      parentUserId_playerId: { parentUserId: parentUser.id, playerId: player.id },
+    },
+    create: {
+      parentUserId: parentUser.id,
+      playerId: player.id,
+      relationship: "parent",
+    },
+    update: {},
+  });
 
   // Create invoice in PENDING state with full price
   const invoice = await db.invoice.create({
