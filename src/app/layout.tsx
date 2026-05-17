@@ -1,8 +1,10 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
+import { ServiceWorkerRegistrar } from "@/components/pwa/ServiceWorkerRegistrar";
+import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -15,10 +17,31 @@ export const metadata: Metadata = {
     "The modern operations platform for soccer coaches, academies, and clubs. Bookings, programs, attendance, payments, comms — built mobile-first.",
   keywords: ["soccer", "coaching", "academy", "club", "youth sports", "SportsEngine alternative"],
   authors: [{ name: "KickNScream" }],
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "KickNScream",
+    statusBarStyle: "black-translucent",
+  },
+  icons: {
+    icon: [
+      { url: "/icons/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
   openGraph: {
     type: "website",
     siteName: "KickNScream",
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0A1410",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -47,6 +70,8 @@ export default function RootLayout({
               },
             }}
           />
+          <ServiceWorkerRegistrar />
+          <InstallPrompt />
         </ThemeProvider>
       </body>
     </html>

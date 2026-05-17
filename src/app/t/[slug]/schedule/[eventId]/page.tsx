@@ -189,6 +189,8 @@ export default async function EventDetailPage({
             tenantId={tenant.id}
             eventId={event.id}
             players={playersForComposer}
+            programName={event.program?.name ?? event.title}
+            eventTitle={event.title}
           />
         )}
 

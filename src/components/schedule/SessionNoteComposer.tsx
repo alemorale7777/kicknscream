@@ -15,7 +15,7 @@ import {
 import { toast } from "sonner";
 import { createSessionNoteAction } from "@/actions/sessionNote";
 import { Markdown } from "./Markdown";
-import { Eye, PencilLine, Mail, Loader2, Sparkles } from "lucide-react";
+import { Eye, PencilLine, Mail, Loader2, Sparkles, Wand2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type PlayerLite = { id: string; firstName: string; lastName: string };
@@ -30,16 +30,74 @@ export function SessionNoteComposer({
   tenantId,
   eventId,
   players,
+  programName,
+  eventTitle,
 }: {
   tenantId: string;
   eventId: string;
   players: PlayerLite[];
+  programName?: string;
+  eventTitle?: string;
 }) {
   const [content, setContent] = useState("");
   const [playerId, setPlayerId] = useState<string>(players[0]?.id ?? "");
   const [visibleToParent, setVisibleToParent] = useState(true);
   const [tab, setTab] = useState<"write" | "preview">("write");
   const [pending, startTransition] = useTransition();
+  const [aiPending, setAiPending] = useState(false);
+
+  async function runAiAssist() {
+    const bullets = content.trim();
+    if (bullets.length < 3) {
+      toast.error("Jot a few rough notes first — even three words works.");
+      return;
+    }
+    const selectedPlayer = players.find((p) => p.id === playerId);
+    const playerName = selectedPlayer
+      ? `${selectedPlayer.firstName} ${selectedPlayer.lastName}`
+      : undefined;
+    setAiPending(true);
+    setTab("write");
+    setContent("");
+    try {
+      const res = await fetch("/api/ai/session-note", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bullets,
+          playerName,
+          programName: programName ?? eventTitle,
+          context: eventTitle && eventTitle !== programName ? eventTitle : undefined,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: "Failed" }));
+        toast.error(body.error ?? "AI assist failed");
+        setContent(bullets);
+        return;
+      }
+      const reader = res.body?.getReader();
+      if (!reader) {
+        toast.error("Streaming not supported");
+        setContent(bullets);
+        return;
+      }
+      const decoder = new TextDecoder();
+      let acc = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        acc += decoder.decode(value, { stream: true });
+        setContent(acc);
+      }
+      toast.success("Draft ready — edit before saving");
+    } catch (e) {
+      toast.error((e as Error).message);
+      setContent(bullets);
+    } finally {
+      setAiPending(false);
+    }
+  }
 
   function submit() {
     if (content.trim().length < 2) {
@@ -138,6 +196,27 @@ Supports **bold**, *italic*, and bullet lists with - dashes."
             {s.split("\n")[0].slice(0, 26)}…
           </button>
         ))}
+        <div className="ml-auto">
+          <button
+            type="button"
+            onClick={runAiAssist}
+            disabled={aiPending || pending || content.trim().length < 3}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-semibold transition-all duration-[120ms]",
+              "bg-flood-400/15 text-flood-400 border border-flood-400/40",
+              "hover:bg-flood-400/25 hover:border-flood-400/70",
+              "disabled:opacity-40 disabled:cursor-not-allowed"
+            )}
+            title="Turn your bullets into a parent-ready note"
+          >
+            {aiPending ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Wand2 className="h-3 w-3" />
+            )}
+            {aiPending ? "Drafting…" : "AI polish"}
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 items-end pt-3 border-t border-line">
