@@ -152,12 +152,21 @@ export default async function PublicTenantPage({
         </p>
 
         <div className="mt-10 flex flex-wrap gap-3">
-          <Button variant="accent" size="lg" asChild>
-            <Link href={`/auth/signin?callbackUrl=/t/${tenant.slug}/dashboard`} className="inline-flex items-center gap-2">
-              {copy.cta}
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </Button>
+          {tenant.type === "CLUB" ? (
+            <Button variant="accent" size="lg" asChild>
+              <Link href={`/${tenant.slug}/tryouts`} className="inline-flex items-center gap-2">
+                <Trophy className="h-4 w-4" />
+                Apply for tryouts
+              </Link>
+            </Button>
+          ) : (
+            <Button variant="accent" size="lg" asChild>
+              <Link href={`/auth/signin?callbackUrl=/t/${tenant.slug}/dashboard`} className="inline-flex items-center gap-2">
+                {copy.cta}
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
+          )}
         </div>
       </section>
 
