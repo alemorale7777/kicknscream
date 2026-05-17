@@ -1,0 +1,429 @@
+// KickNScream multi-tenant schema
+// COACH | INSTITUTION | CLUB share 80% of this schema; the 20% delta is
+// feature-flagged at the application layer, not the database.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// =====================================================================
+// AUTH (NextAuth/Auth.js v5 — required tables)
+// =====================================================================
+
+model User {
+  id            String       @id @default(cuid())
+  email         String       @unique
+  name          String?
+  phone         String?
+  emailVerified DateTime?
+  image         String?
+  memberships   Membership[]
+  sessions      Session[]
+  accounts      Account[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// =====================================================================
+// TENANCY
+// =====================================================================
+
+enum TenantType {
+  COACH
+  INSTITUTION
+  CLUB
+}
+
+enum Role {
+  OWNER // founder/owner of the tenant
+  ADMIN // full management access
+  COACH // can lead sessions, take attendance, write notes
+  PARENT // has player(s) registered
+  PLAYER // the kid (linked to parent)
+}
+
+model Tenant {
+  id              String         @id @default(cuid())
+  slug            String         @unique
+  name            String
+  type            TenantType
+  logoUrl         String?
+  primaryColor    String?
+  stripeAccountId String?
+  subscription    Subscription?
+  memberships     Membership[]
+  locations       Location[]
+  programs        Program[]
+  players         Player[]
+  events          Event[]
+  invoices        Invoice[]
+  waivers         Waiver[]
+  invitations     Invitation[]
+  tryouts         TryoutSignup[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model Membership {
+  id        String   @id @default(cuid())
+  userId    String
+  tenantId  String
+  role      Role
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, tenantId])
+  @@index([tenantId])
+}
+
+model Invitation {
+  id         String    @id @default(cuid())
+  tenantId   String
+  email      String
+  role       Role
+  token      String    @unique
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  invitedBy  String
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+
+  @@index([tenantId])
+  @@index([email])
+}
+
+model Location {
+  id       String  @id @default(cuid())
+  tenantId String
+  name     String
+  address  String?
+  events   Event[]
+  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+}
+
+// =====================================================================
+// PROGRAMS, EVENTS, PLAYERS, ATTENDANCE
+// =====================================================================
+
+enum SkillLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  ELITE
+}
+
+enum PriceModel {
+  PER_SESSION
+  PACKAGE
+  MONTHLY
+  SEASON
+  FREE
+}
+
+model Program {
+  id          String       @id @default(cuid())
+  tenantId    String
+  name        String
+  description String?
+  ageMin      Int?
+  ageMax      Int?
+  skillLevel  SkillLevel?
+  price       Int // in cents
+  priceModel  PriceModel
+  capacity    Int?
+  archived    Boolean      @default(false)
+  events      Event[]
+  enrollments Enrollment[]
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+}
+
+enum EventType {
+  LESSON
+  CLASS
+  PRACTICE
+  GAME
+  TRYOUT
+  CAMP
+  CLINIC
+}
+
+model Event {
+  id          String        @id @default(cuid())
+  tenantId    String
+  programId   String?
+  locationId  String?
+  type        EventType
+  title       String
+  startsAt    DateTime
+  endsAt      DateTime
+  capacity    Int?
+  attendances Attendance[]
+  notes       SessionNote[]
+  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  program     Program?      @relation(fields: [programId], references: [id])
+  location    Location?     @relation(fields: [locationId], references: [id])
+
+  @@index([tenantId, startsAt])
+  @@index([programId])
+}
+
+model Player {
+  id               String            @id @default(cuid())
+  tenantId         String
+  firstName        String
+  lastName         String
+  dob              DateTime
+  parentId         String?
+  position         String?
+  jerseyNumber     Int?
+  notes            String?
+  enrollments      Enrollment[]
+  attendances      Attendance[]
+  developmentNotes DevelopmentNote[]
+  waiverSignatures WaiverSignature[]
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+}
+
+enum EnrollmentStatus {
+  PENDING
+  ACTIVE
+  WAITLIST
+  CANCELED
+  COMPLETED
+}
+
+model Enrollment {
+  id        String           @id @default(cuid())
+  playerId  String
+  programId String
+  status    EnrollmentStatus
+  invoiceId String?
+  player    Player           @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  program   Program          @relation(fields: [programId], references: [id])
+  invoice   Invoice?         @relation(fields: [invoiceId], references: [id])
+  createdAt DateTime         @default(now())
+
+  @@index([programId])
+  @@index([playerId])
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+  PENDING
+}
+
+model Attendance {
+  id          String           @id @default(cuid())
+  eventId     String
+  playerId    String
+  status      AttendanceStatus
+  checkedInAt DateTime?
+  checkedInBy String?
+  event       Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  player      Player           @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, playerId])
+}
+
+model SessionNote {
+  id              String   @id @default(cuid())
+  eventId         String
+  playerId        String?
+  authorId        String
+  content         String
+  visibleToParent Boolean  @default(true)
+  event           Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+}
+
+model DevelopmentNote {
+  id        String   @id @default(cuid())
+  playerId  String
+  authorId  String
+  category  String?
+  rating    Int?
+  content   String
+  player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+// =====================================================================
+// PAYMENTS — handles Stripe, cash, check, Venmo, Zelle
+// =====================================================================
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PARTIAL
+  PAID
+  OVERDUE
+  VOIDED
+}
+
+model Invoice {
+  id                    String        @id @default(cuid())
+  tenantId              String
+  payerEmail            String
+  amount                Int // cents
+  currency              String        @default("usd")
+  status                InvoiceStatus
+  description           String?
+  stripePaymentIntentId String?
+  payments              Payment[]
+  enrollments           Enrollment[]
+  tenant                Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt             DateTime      @default(now())
+  paidAt                DateTime?
+
+  @@index([tenantId, status])
+}
+
+enum PaymentMethod {
+  CARD
+  CASH
+  CHECK
+  VENMO
+  ZELLE
+  PAYPAL
+  ACH
+  OTHER
+}
+
+model Payment {
+  id         String        @id @default(cuid())
+  invoiceId  String
+  amount     Int
+  method     PaymentMethod
+  reference  String?
+  recordedBy String?
+  invoice    Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  createdAt  DateTime      @default(now())
+}
+
+// =====================================================================
+// WAIVERS
+// =====================================================================
+
+model Waiver {
+  id         String            @id @default(cuid())
+  tenantId   String
+  title      String
+  body       String
+  required   Boolean           @default(true)
+  signatures WaiverSignature[]
+  tenant     Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model WaiverSignature {
+  id          String   @id @default(cuid())
+  waiverId    String
+  playerId    String
+  signerName  String
+  signerEmail String
+  signedAt    DateTime @default(now())
+  ipAddress   String?
+  waiver      Waiver   @relation(fields: [waiverId], references: [id], onDelete: Cascade)
+  player      Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+}
+
+// =====================================================================
+// SUBSCRIPTIONS — KickNScream platform billing (not parents-pay-tenant)
+// =====================================================================
+
+enum SubPlan {
+  COACH_FREE
+  COACH_PRO
+  COACH_ELITE
+  INST_STARTER
+  INST_GROWTH
+  INST_SCALE
+  CLUB_STANDARD
+  CLUB_PRO
+}
+
+model Subscription {
+  id               String    @id @default(cuid())
+  tenantId         String    @unique
+  plan             SubPlan
+  stripeSubId      String?
+  status           String
+  currentPeriodEnd DateTime?
+  tenant           Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+// =====================================================================
+// CLUB — tryouts/recruitment
+// =====================================================================
+
+enum TryoutStatus {
+  PENDING
+  INVITED
+  ATTENDED
+  OFFERED
+  ACCEPTED
+  DECLINED
+}
+
+model TryoutSignup {
+  id          String       @id @default(cuid())
+  tenantId    String
+  playerName  String
+  parentEmail String
+  parentPhone String?
+  ageGroup    String
+  videoUrl    String?
+  notes       String?
+  status      TryoutStatus @default(PENDING)
+  createdAt   DateTime     @default(now())
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+}
