@@ -57,6 +57,7 @@ export default function RootLayout({
     >
       <body className="min-h-full bg-pitch-900 text-ink-50">
         <ThemeProvider>
+          <InstallPrompt />
           {children}
           <Toaster
             theme="dark"
@@ -71,7 +72,6 @@ export default function RootLayout({
             }}
           />
           <ServiceWorkerRegistrar />
-          <InstallPrompt />
         </ThemeProvider>
       </body>
     </html>

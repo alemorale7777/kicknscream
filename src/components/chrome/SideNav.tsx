@@ -38,14 +38,6 @@ export function SideNav({ tenant }: { tenant: Tenant; role?: Role }) {
         })}
       </nav>
 
-      <div className="p-4 border-t border-line">
-        <div className="rounded-md bg-pitch-800 border border-line p-3 space-y-1">
-          <p className="text-[10px] uppercase tracking-wider text-flood-400">Sprint 1</p>
-          <p className="text-xs text-ink-300 leading-relaxed">
-            Foundation shipped. Calendar & roster land in Sprint 2.
-          </p>
-        </div>
-      </div>
     </aside>
   );
 }

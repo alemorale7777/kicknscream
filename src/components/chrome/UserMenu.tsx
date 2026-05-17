@@ -12,6 +12,7 @@ import { getInitials } from "@/lib/utils";
 import type { User } from "@prisma/client";
 import { LogOut, User as UserIcon } from "lucide-react";
 import Link from "next/link";
+import { ThemeToggleItem } from "./ThemeToggleItem";
 
 export function UserMenu({ user }: { user: User }) {
   return (
@@ -34,6 +35,7 @@ export function UserMenu({ user }: { user: User }) {
             Create new tenant
           </Link>
         </DropdownMenuItem>
+        <ThemeToggleItem />
         <DropdownMenuSeparator />
         <form
           action={async () => {

@@ -63,6 +63,31 @@
     color-scheme: dark;
   }
 
+  /* Light theme — inverted Pitch & Floodlight.
+     Surface scale flipped so 950 is darkest TEXT and lower numbers
+     are brighter surfaces. Turf + flood accents stay the same hue. */
+  :root.light {
+    color-scheme: light;
+    --color-pitch-950: #F5F7F4; /* darkest surface in light = brightest text in dark */
+    --color-pitch-900: #FFFFFF;
+    --color-pitch-800: #F5F7F4;
+    --color-pitch-700: #E8ECE8;
+    --color-pitch-600: #D6DCD7;
+    --color-pitch-500: #B4C0B7;
+
+    --color-ink-50: #0A1410;
+    --color-ink-300: #2C4A3D;
+    --color-ink-500: #5A6A62;
+    --color-ink-700: #94A39B;
+
+    --color-chalk: rgba(10, 20, 16, 0.08);
+    --color-line: rgba(10, 20, 16, 0.14);
+
+    --color-flood-400: #B8D900; /* darker so it readable on white bg */
+    --color-flood-300: #CFE52C;
+    --color-flood-200: #DEED49;
+  }
+
   html,
   body {
     background: var(--color-pitch-900);
