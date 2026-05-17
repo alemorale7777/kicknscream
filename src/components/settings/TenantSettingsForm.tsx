@@ -85,7 +85,7 @@ export function TenantSettingsForm({ tenant, canEdit }: { tenant: Tenant; canEdi
         <Label>URL slug</Label>
         <Input value={tenant.slug} disabled className="font-mono opacity-60" />
         <p className="text-xs text-ink-500">
-          Slug changes aren't supported yet. Contact support if you need to change yours.
+          Slug changes aren&apos;t supported yet. Contact support if you need to change yours.
         </p>
       </div>
 

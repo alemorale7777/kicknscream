@@ -1,9 +1,12 @@
 import { z } from "zod";
 
 /**
- * Server-only env contract. Imported by server modules that need secrets
- * (auth.ts, server actions, route handlers). Throws at module-load time
- * if anything required is missing so we fail fast and obviously.
+ * Server-only env contract.
+ *
+ * During Next.js build (phase-production-build) we tolerate missing values
+ * because the build pass executes server modules for route discovery and
+ * doesn't actually need real secrets. At runtime (dev server, production
+ * runtime) we fail fast and obviously.
  */
 const envSchema = z.object({
   DATABASE_URL: z.string().min(20),
@@ -21,11 +24,35 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 });
 
+const isBuildPhase = process.env.NEXT_PHASE === "phase-production-build";
+
 const parsed = envSchema.safeParse(process.env);
 
-if (!parsed.success) {
-  const issues = parsed.error.issues.map((i) => `  ${i.path.join(".")}: ${i.message}`).join("\n");
-  throw new Error(`Invalid environment variables:\n${issues}\n\nDid you copy .env.example to .env.local and fill it in?`);
+if (!parsed.success && !isBuildPhase) {
+  const issues = parsed.error.issues
+    .map((i) => `  ${i.path.join(".")}: ${i.message}`)
+    .join("\n");
+  throw new Error(
+    `Invalid environment variables:\n${issues}\n\nDid you copy .env.example to .env.local and fill it in?`
+  );
 }
 
-export const env = parsed.data;
+/**
+ * In build phase we expose a partial Proxy that returns stub strings for
+ * missing keys so module-load doesn't blow up. Reads after build (runtime)
+ * always hit real env vars.
+ */
+export const env = parsed.success
+  ? parsed.data
+  : (new Proxy(
+      {} as z.infer<typeof envSchema>,
+      {
+        get(_t, key: string) {
+          const val = process.env[key];
+          if (val !== undefined) return val;
+          // build-time stub
+          if (key === "NODE_ENV") return "production";
+          return "_build_stub_";
+        },
+      }
+    ) as z.infer<typeof envSchema>);

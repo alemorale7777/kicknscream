@@ -116,7 +116,7 @@ export function StepType({
       </div>
 
       <p className="text-xs text-ink-500">
-        Not sure? Pick what's closest — you can rename, restructure, or migrate later. Nothing is locked in.
+        Not sure? Pick what&apos;s closest — you can rename, restructure, or migrate later. Nothing is locked in.
       </p>
     </div>
   );

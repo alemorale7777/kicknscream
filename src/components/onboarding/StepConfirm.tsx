@@ -31,7 +31,7 @@ export function StepConfirm({
           Ready to kick off
         </h1>
         <p className="text-ink-300 max-w-xl">
-          Review your setup. Everything below is editable from Settings once we're live.
+          Review your setup. Everything below is editable from Settings once we&apos;re live.
         </p>
       </header>
 
@@ -88,7 +88,7 @@ export function StepConfirm({
       <div className="rounded-md border border-flood-400/30 bg-flood-400/5 p-4">
         <p className="text-xs uppercase tracking-wider text-flood-400 mb-1">What happens next</p>
         <p className="text-sm text-ink-300">
-          We'll spin up your tenant, make you the OWNER, and drop you on your dashboard. You can invite
+          We&apos;ll spin up your tenant, make you the OWNER, and drop you on your dashboard. You can invite
           teammates and start configuring from there.
         </p>
       </div>

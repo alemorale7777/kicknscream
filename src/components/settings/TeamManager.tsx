@@ -110,7 +110,7 @@ export function TeamManager({
             </div>
             <div className="space-y-1.5">
               <Label>Role</Label>
-              <Select value={role} onValueChange={(v) => setValue("role", v as Role)}>
+              <Select value={role} onValueChange={(v) => setValue("role", v as "ADMIN" | "COACH" | "PARENT" | "PLAYER")}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

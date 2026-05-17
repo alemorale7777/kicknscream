@@ -28,28 +28,33 @@ export function StepDetails({
   onNext: (v: Partial<WizardData>) => void;
 }) {
   const [name, setName] = useState(value.name ?? "");
-  const [slug, setSlug] = useState(value.slug ?? "");
+  const [slug, setSlug] = useState(value.slug ?? generateSlug(value.name ?? ""));
   const [slugTouched, setSlugTouched] = useState(!!value.slug);
   const [color, setColor] = useState(value.primaryColor ?? "#1FB663");
   const [logoUrl, setLogoUrl] = useState<string | null>(value.logoUrl ?? null);
   const [uploading, setUploading] = useState(false);
-  const [slugState, setSlugState] = useState<SlugState>({ state: "idle" });
+  const [slugState, setSlugState] = useState<SlugState>(
+    slug.length < 2 ? { state: "idle" } : { state: "checking" }
+  );
   const [checking, startChecking] = useTransition();
 
-  // Auto-sync slug from name until the user manually edits it
-  useEffect(() => {
+  function handleNameChange(next: string) {
+    setName(next);
     if (!slugTouched) {
-      setSlug(generateSlug(name));
+      setSlug(generateSlug(next));
     }
-  }, [name, slugTouched]);
+  }
 
-  // Debounced live slug check
+  function handleSlugChange(next: string) {
+    setSlug(generateSlug(next));
+    setSlugTouched(true);
+  }
+
+  // Debounced server-side slug availability check.
+  // Effects only run side-effects (fetch); state derivations live in
+  // the input handlers above to comply with React 19 compiler rules.
   useEffect(() => {
-    if (slug.length < 2) {
-      setSlugState({ state: "idle" });
-      return;
-    }
-    setSlugState({ state: "checking" });
+    if (slug.length < 2) return;
     const handle = setTimeout(() => {
       startChecking(async () => {
         try {
@@ -109,7 +114,7 @@ export function StepDetails({
           <Input
             id="name"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => handleNameChange(e.target.value)}
             placeholder="Coach Alej / PDX Skills / Cascadia FC"
             autoFocus
           />
@@ -122,10 +127,7 @@ export function StepDetails({
             <input
               id="slug"
               value={slug}
-              onChange={(e) => {
-                setSlug(generateSlug(e.target.value));
-                setSlugTouched(true);
-              }}
+              onChange={(e) => handleSlugChange(e.target.value)}
               className="flex-1 bg-transparent text-sm text-ink-50 placeholder:text-ink-700 outline-none font-mono"
               placeholder="your-slug"
             />
@@ -140,7 +142,7 @@ export function StepDetails({
               }}
               className="text-xs text-turf-300 hover:text-turf-200 underline-offset-4 hover:underline"
             >
-              Use "{slugState.suggested}" instead →
+              Use &ldquo;{slugState.suggested}&rdquo; instead →
             </button>
           )}
           {slugState.state === "idle" && (
