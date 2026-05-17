@@ -53,7 +53,7 @@ export function TenantSwitcher({
         {available.map((t) => (
           <DropdownMenuItem key={t.id} asChild>
             <Link
-              href={`/t/${t.slug}/dashboard`}
+              href={`/t/${t.slug}/coach/dashboard`}
               className="flex justify-between items-center cursor-pointer"
             >
               <span className="flex items-center gap-2 truncate">

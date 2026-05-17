@@ -1,18 +1,17 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { legacyRedirectPath } from "@/lib/auth/portal";
 
 /**
- * Auth gate for tenant pages and onboarding.
+ * Auth gate + portal redirects.
  * Next 16 uses `proxy.ts` instead of `middleware.ts`.
  *
- * Anything under /t/[slug]/* or /onboarding requires a session.
- * Unauthed users get bounced to /auth/signin with the original URL
- * preserved as ?callbackUrl=.
- *
- * Note: legacy URL → portal URL 308 redirects are wired in a later PR,
- * after the new (coach)/(family)/(admin) routes actually exist. The helper
- * `legacyRedirectPath` is already exported from `@/lib/auth/portal` and
- * ready to flip on.
+ * 1. Anything under /t/[slug]/* or /onboarding requires a session — unauthed
+ *    users bounce to /auth/signin with the original URL preserved.
+ * 2. Legacy /t/[slug]/<segment> paths (dashboard, bookings, schedule, etc.)
+ *    308 to /t/[slug]/coach/<segment> so old bookmarks land at the new home.
+ * 3. Per-role default-portal landing is NOT done here (proxy has no DB
+ *    access). The coach/family/admin layout.tsx files handle that.
  */
 export default auth((req) => {
   const { nextUrl } = req;
@@ -24,6 +23,13 @@ export default auth((req) => {
     const signin = new URL("/auth/signin", nextUrl.origin);
     signin.searchParams.set("callbackUrl", nextUrl.pathname + nextUrl.search);
     return NextResponse.redirect(signin);
+  }
+
+  const newPath = legacyRedirectPath(nextUrl.pathname);
+  if (newPath) {
+    const target = new URL(newPath, nextUrl.origin);
+    target.search = nextUrl.search;
+    return NextResponse.redirect(target, 308);
   }
 
   return NextResponse.next();

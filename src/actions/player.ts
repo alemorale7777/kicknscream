@@ -95,7 +95,7 @@ export async function createPlayerAction(input: z.infer<typeof createPlayerSchem
     },
   });
 
-  revalidatePath(`/t/${tenant.slug}/roster`);
+  revalidatePath(`/t/${tenant.slug}/coach/roster`);
   return { parentInvited };
 }
 
@@ -126,12 +126,12 @@ export async function updatePlayerAction(input: z.infer<typeof updatePlayerSchem
     },
   });
 
-  revalidatePath(`/t/${membership.tenant.slug}/roster`);
+  revalidatePath(`/t/${membership.tenant.slug}/coach/roster`);
 }
 
 export async function deletePlayerAction(tenantId: string, playerId: string) {
   const { membership } = await assertCanManage(tenantId);
   if (!membership.tenant) throw new Error("Tenant not found");
   await db.player.delete({ where: { id: playerId } });
-  revalidatePath(`/t/${membership.tenant.slug}/roster`);
+  revalidatePath(`/t/${membership.tenant.slug}/coach/roster`);
 }

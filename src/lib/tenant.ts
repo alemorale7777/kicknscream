@@ -35,7 +35,7 @@ export async function requireTenant(slug: string) {
   if (!tenant) notFound();
 
   const user = await getCurrentUser();
-  if (!user) redirect(`/auth/signin?callbackUrl=/t/${slug}/dashboard`);
+  if (!user) redirect(`/auth/signin?callbackUrl=/t/${slug}/coach/dashboard`);
 
   const membership = user.memberships.find((m) => m.tenantId === tenant.id);
   if (!membership) notFound();

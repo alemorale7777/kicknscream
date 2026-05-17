@@ -97,7 +97,7 @@ export default async function PlayerProfilePage({
     <div className="max-w-5xl space-y-6">
       <div>
         <Link
-          href={`/t/${tenant.slug}/roster`}
+          href={`/t/${tenant.slug}/coach/roster`}
           className="inline-flex items-center gap-1 text-xs text-ink-500 hover:text-ink-300 transition-colors"
         >
           <ArrowLeft className="h-3 w-3" />
@@ -185,7 +185,7 @@ export default async function PlayerProfilePage({
             return (
               <Link
                 key={t.id}
-                href={`/t/${tenant.slug}/roster/${player.id}${t.id === "overview" ? "" : `?tab=${t.id}`}`}
+                href={`/t/${tenant.slug}/coach/roster/${player.id}${t.id === "overview" ? "" : `?tab=${t.id}`}`}
                 className={cn(
                   "inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors duration-[120ms] whitespace-nowrap",
                   active
@@ -238,7 +238,7 @@ export default async function PlayerProfilePage({
               </Card>
             ) : (
               events.map((ev) => (
-                <Link key={ev.id} href={`/t/${tenant.slug}/schedule/${ev.id}`} className="block">
+                <Link key={ev.id} href={`/t/${tenant.slug}/coach/schedule/${ev.id}`} className="block">
                   <Card className="p-3 flex items-center gap-3 hover:border-turf-400/40 transition-colors">
                     <div className="text-xs font-mono text-ink-300 shrink-0 w-32">
                       {format(ev.startsAt, "MMM d · h:mm a")}

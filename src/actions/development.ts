@@ -56,7 +56,7 @@ export async function createDevelopmentNoteAction(input: z.infer<typeof schema>)
   });
 
   if (membership.tenant) {
-    revalidatePath(`/t/${membership.tenant.slug}/development`);
+    revalidatePath(`/t/${membership.tenant.slug}/coach/development`);
   }
 }
 
@@ -69,7 +69,7 @@ export async function deleteDevelopmentNoteAction(tenantId: string, noteId: stri
   }
   await db.developmentNote.delete({ where: { id: noteId } });
   if (membership.tenant) {
-    revalidatePath(`/t/${membership.tenant.slug}/development`);
+    revalidatePath(`/t/${membership.tenant.slug}/coach/development`);
   }
 }
 

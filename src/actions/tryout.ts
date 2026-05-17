@@ -67,7 +67,7 @@ export async function updateTryoutStatusAction(input: z.infer<typeof updateSchem
     data: { status: data.status as TryoutStatus },
   });
 
-  revalidatePath(`/t/${membership.tenant.slug}/tryouts`);
+  revalidatePath(`/t/${membership.tenant.slug}/coach/tryouts`);
 }
 
 export async function deleteTryoutAction(tenantId: string, tryoutId: string) {
@@ -79,5 +79,5 @@ export async function deleteTryoutAction(tenantId: string, tryoutId: string) {
   }
   if (!membership.tenant) throw new Error("Tenant not found");
   await db.tryoutSignup.delete({ where: { id: tryoutId } });
-  revalidatePath(`/t/${membership.tenant.slug}/tryouts`);
+  revalidatePath(`/t/${membership.tenant.slug}/coach/tryouts`);
 }

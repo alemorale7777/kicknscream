@@ -32,7 +32,7 @@ export async function createLocationAction(input: z.infer<typeof locationSchema>
       address: data.address || null,
     },
   });
-  if (membership.tenant) revalidatePath(`/t/${membership.tenant.slug}/settings/locations`);
+  if (membership.tenant) revalidatePath(`/t/${membership.tenant.slug}/coach/settings/locations`);
 }
 
 const updateSchema = locationSchema.extend({ id: z.string() });
@@ -47,11 +47,11 @@ export async function updateLocationAction(input: z.infer<typeof updateSchema>) 
       address: data.address || null,
     },
   });
-  if (membership.tenant) revalidatePath(`/t/${membership.tenant.slug}/settings/locations`);
+  if (membership.tenant) revalidatePath(`/t/${membership.tenant.slug}/coach/settings/locations`);
 }
 
 export async function deleteLocationAction(tenantId: string, id: string) {
   const { membership } = await assertCanManage(tenantId);
   await db.location.delete({ where: { id } });
-  if (membership.tenant) revalidatePath(`/t/${membership.tenant.slug}/settings/locations`);
+  if (membership.tenant) revalidatePath(`/t/${membership.tenant.slug}/coach/settings/locations`);
 }

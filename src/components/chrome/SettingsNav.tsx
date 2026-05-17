@@ -8,7 +8,7 @@ import type { Tenant } from "@prisma/client";
 
 export function SettingsNav({ tenant, isOwner }: { tenant: Tenant; isOwner: boolean }) {
   const pathname = usePathname();
-  const base = `/t/${tenant.slug}/settings`;
+  const base = `/t/${tenant.slug}/coach/settings`;
 
   const items = [
     { href: base, label: "Tenant info", icon: Building2 },

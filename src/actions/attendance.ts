@@ -47,7 +47,7 @@ export async function markAttendanceAction(input: z.infer<typeof markSchema>) {
   });
 
   if (membership.tenant) {
-    revalidatePath(`/t/${membership.tenant.slug}/schedule/${data.eventId}`);
+    revalidatePath(`/t/${membership.tenant.slug}/coach/schedule/${data.eventId}`);
   }
 }
 
@@ -75,6 +75,6 @@ export async function bulkMarkAttendanceAction(input: z.infer<typeof bulkSchema>
   );
 
   if (membership.tenant) {
-    revalidatePath(`/t/${membership.tenant.slug}/schedule/${data.eventId}`);
+    revalidatePath(`/t/${membership.tenant.slug}/coach/schedule/${data.eventId}`);
   }
 }

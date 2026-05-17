@@ -14,14 +14,14 @@ describe("navForTenantType", () => {
     ]);
   });
 
-  it("coach Players nav routes to /roster (shared with institution/club)", () => {
+  it("coach Players nav routes to /coach/roster (portal-scoped)", () => {
     const items = navForTenantType("COACH", "alej");
-    expect(items.find((i) => i.label === "Players")?.href).toBe("/t/alej/roster");
+    expect(items.find((i) => i.label === "Players")?.href).toBe("/t/alej/coach/roster");
   });
 
-  it("coach Services nav routes to /programs (shared with institution)", () => {
+  it("coach Services nav routes to /coach/programs (portal-scoped)", () => {
     const items = navForTenantType("COACH", "alej");
-    expect(items.find((i) => i.label === "Services")?.href).toBe("/t/alej/programs");
+    expect(items.find((i) => i.label === "Services")?.href).toBe("/t/alej/coach/programs");
   });
 
   it("returns institution nav with 9 items", () => {
@@ -44,12 +44,12 @@ describe("navForTenantType", () => {
 
   it("uses the provided slug in hrefs", () => {
     const items = navForTenantType("COACH", "coach-alej");
-    expect(items[0].href).toBe("/t/coach-alej/dashboard");
+    expect(items[0].href).toBe("/t/coach-alej/coach/dashboard");
   });
 
   it("falls back to :slug placeholder when slug omitted", () => {
     const items = navForTenantType("INSTITUTION");
-    expect(items[0].href).toBe("/t/:slug/dashboard");
+    expect(items[0].href).toBe("/t/:slug/coach/dashboard");
   });
 });
 
@@ -61,8 +61,10 @@ describe("NEXT_STEP_BY_TYPE", () => {
   });
 
   it("builds hrefs scoped to the tenant slug", () => {
-    expect(NEXT_STEP_BY_TYPE.COACH.href("alej")).toBe("/t/alej/bookings");
-    expect(NEXT_STEP_BY_TYPE.INSTITUTION.href("pdx-skills")).toBe("/t/pdx-skills/programs");
+    expect(NEXT_STEP_BY_TYPE.COACH.href("alej")).toBe("/t/alej/coach/bookings");
+    expect(NEXT_STEP_BY_TYPE.INSTITUTION.href("pdx-skills")).toBe(
+      "/t/pdx-skills/coach/programs"
+    );
     expect(NEXT_STEP_BY_TYPE.CLUB.href("cascadia")).toBe("/t/cascadia/teams");
   });
 });

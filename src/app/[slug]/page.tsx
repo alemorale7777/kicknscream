@@ -210,7 +210,7 @@ export default async function PublicTenantPage({
             </Button>
           ) : (
             <Button variant="accent" size="lg" asChild>
-              <Link href={`/auth/signin?callbackUrl=/t/${tenant.slug}/dashboard`} className="inline-flex items-center gap-2">
+              <Link href={`/auth/signin?callbackUrl=/t/${tenant.slug}/coach/dashboard`} className="inline-flex items-center gap-2">
                 {copy.cta}
                 <ArrowRight className="h-4 w-4" />
               </Link>
@@ -265,7 +265,7 @@ export default async function PublicTenantPage({
           </div>
           {upcomingEvents.length > 0 && (
             <Link
-              href={`/auth/signin?callbackUrl=/t/${tenant.slug}/schedule`}
+              href={`/auth/signin?callbackUrl=/t/${tenant.slug}/coach/schedule`}
               className="text-sm text-turf-300 hover:text-turf-200 underline-offset-4 hover:underline"
             >
               See full schedule →
@@ -335,7 +335,7 @@ export default async function PublicTenantPage({
             </p>
             <div className="mt-6 flex flex-wrap gap-3 justify-center">
               <Button variant="accent" size="lg" asChild>
-                <Link href={`/auth/signin?callbackUrl=/t/${tenant.slug}/dashboard`}>{copy.cta}</Link>
+                <Link href={`/auth/signin?callbackUrl=/t/${tenant.slug}/coach/dashboard`}>{copy.cta}</Link>
               </Button>
               <Button variant="outline" size="lg" asChild>
                 <Link href="/auth/signin">Sign in</Link>

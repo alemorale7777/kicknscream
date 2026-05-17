@@ -69,7 +69,7 @@ export async function createEventAction(input: z.infer<typeof baseEventSchema>) 
     })),
   });
 
-  revalidatePath(`/t/${membership.tenant.slug}/schedule`);
+  revalidatePath(`/t/${membership.tenant.slug}/coach/schedule`);
   return { count: occurrences.length };
 }
 
@@ -97,12 +97,12 @@ export async function updateEventAction(input: z.infer<typeof updateEventSchema>
     },
   });
 
-  revalidatePath(`/t/${membership.tenant.slug}/schedule`);
+  revalidatePath(`/t/${membership.tenant.slug}/coach/schedule`);
 }
 
 export async function deleteEventAction(tenantId: string, eventId: string) {
   const { membership } = await assertCanManage(tenantId);
   if (!membership.tenant) throw new Error("Tenant not found");
   await db.event.delete({ where: { id: eventId } });
-  revalidatePath(`/t/${membership.tenant.slug}/schedule`);
+  revalidatePath(`/t/${membership.tenant.slug}/coach/schedule`);
 }

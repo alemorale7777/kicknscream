@@ -26,7 +26,7 @@ export function TodayWidget({
           <p className="text-xs text-ink-500 mt-0.5">Enjoy the rest day — or add a session below.</p>
         </div>
         <Button variant="outline" size="sm" asChild>
-          <Link href={`/t/${tenantSlug}/schedule`}>
+          <Link href={`/t/${tenantSlug}/coach/schedule`}>
             View schedule
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
@@ -50,7 +50,7 @@ export function TodayWidget({
           </h3>
         </div>
         <Button variant="ghost" size="sm" asChild>
-          <Link href={`/t/${tenantSlug}/schedule`}>
+          <Link href={`/t/${tenantSlug}/coach/schedule`}>
             Full schedule
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
@@ -86,7 +86,7 @@ function EventRow({
   const tone = EVENT_TONE[event.type];
   return (
     <Link
-      href={`/t/${tenantSlug}/schedule/${event.id}`}
+      href={`/t/${tenantSlug}/coach/schedule/${event.id}`}
       className="group flex items-center gap-4 px-5 py-4 hover:bg-pitch-700/40 transition-colors duration-[120ms]"
     >
       <div className="text-center w-14 shrink-0 font-mono">
