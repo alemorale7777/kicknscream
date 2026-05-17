@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { WeekView } from "./WeekView";
@@ -33,15 +34,18 @@ type ViewMode = "week" | "month" | "day";
 
 export function ScheduleClient({
   tenantId,
+  tenantSlug,
   events,
   locations,
   canEdit,
 }: {
   tenantId: string;
+  tenantSlug: string;
   events: EventWithLocation[];
   locations: Location[];
   canEdit: boolean;
 }) {
+  const router = useRouter();
   const [view, setView] = useState<ViewMode>("week");
   const [anchorDate, setAnchorDate] = useState<Date>(new Date());
   const [activeFilters, setActiveFilters] = useState<Set<EventType>>(new Set(ALL_EVENT_TYPES));
@@ -84,9 +88,7 @@ export function ScheduleClient({
   }
 
   function handleEventClick(e: EventWithLocation) {
-    setEditingEvent(e);
-    setDefaultRange(undefined);
-    setDialogOpen(true);
+    router.push(`/t/${tenantSlug}/schedule/${e.id}`);
   }
 
   function handleCellClick(date: Date) {

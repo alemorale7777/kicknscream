@@ -96,3 +96,129 @@ export async function sendBookingConfirmation(opts: {
     text,
   });
 }
+
+export async function sendSessionNoteEmail(opts: {
+  to: string;
+  parentName: string;
+  tenantName: string;
+  tenantSlug: string;
+  playerName: string;
+  coachName: string;
+  eventTitle: string;
+  eventDate: Date;
+  content: string;
+}) {
+  const resend = new Resend(env.AUTH_RESEND_KEY);
+  const dateLine = format(opts.eventDate, "EEEE, MMMM d · h:mm a");
+  const renderedContent = renderMarkdownToInlineHtml(opts.content);
+
+  const html = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Session note from ${escapeHtml(opts.tenantName)}</title></head>
+<body style="margin:0;padding:0;background:#050A07;font-family:-apple-system,system-ui,sans-serif;color:#F5F7F4;">
+  <div style="max-width:560px;margin:0 auto;padding:32px 24px;">
+    <div style="margin-bottom:32px;">
+      <span style="font-size:22px;font-weight:800;letter-spacing:-0.04em;color:#F5F7F4;">KICK<span style="color:#1FB663;">N</span>SCREAM</span>
+      <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#E8FF3C;margin-left:6px;vertical-align:middle;"></span>
+    </div>
+    <div style="background:#0F1C17;border:1px solid rgba(255,255,255,0.14);border-radius:12px;padding:32px;">
+      <p style="margin:0 0 8px;color:#94A39B;font-size:12px;text-transform:uppercase;letter-spacing:0.12em;">Session note</p>
+      <h1 style="margin:0 0 4px;font-size:22px;font-weight:700;letter-spacing:-0.02em;color:#F5F7F4;">${escapeHtml(opts.playerName)}</h1>
+      <p style="margin:0 0 16px;color:#94A39B;font-size:13px;">${escapeHtml(opts.eventTitle)} · ${escapeHtml(dateLine)}</p>
+      <div style="border-top:1px solid rgba(255,255,255,0.14);padding-top:16px;margin-top:8px;color:#C4CDC7;font-size:15px;line-height:1.7;">
+        ${renderedContent}
+      </div>
+      <p style="margin:24px 0 0;color:#5A6A62;font-size:12px;line-height:1.6;">
+        Sent by <strong style="color:#94A39B;">${escapeHtml(opts.coachName)}</strong> at ${escapeHtml(opts.tenantName)}.<br>
+        Reply to this email to follow up directly.
+      </p>
+    </div>
+    <p style="margin:20px 0 0;color:#5A6A62;font-size:12px;text-align:center;">Powered by KickNScream</p>
+  </div>
+</body></html>`;
+
+  const text = `Session note for ${opts.playerName}\n${opts.eventTitle} · ${dateLine}\nFrom ${opts.coachName} at ${opts.tenantName}\n\n${opts.content}`;
+
+  await resend.emails.send({
+    from: env.EMAIL_FROM,
+    to: opts.to,
+    subject: `Session note · ${opts.playerName} · ${opts.eventTitle}`,
+    html,
+    text,
+  });
+}
+
+export async function sendBroadcastEmail(opts: {
+  to: string;
+  recipientName?: string | null;
+  tenantName: string;
+  tenantSlug: string;
+  subject: string;
+  bodyMarkdown: string;
+}) {
+  const resend = new Resend(env.AUTH_RESEND_KEY);
+  const rendered = renderMarkdownToInlineHtml(opts.bodyMarkdown);
+  const greetingName = opts.recipientName ? opts.recipientName.split(" ")[0] : null;
+
+  const html = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>${escapeHtml(opts.subject)}</title></head>
+<body style="margin:0;padding:0;background:#050A07;font-family:-apple-system,system-ui,sans-serif;color:#F5F7F4;">
+  <div style="max-width:560px;margin:0 auto;padding:32px 24px;">
+    <div style="margin-bottom:24px;">
+      <span style="font-size:18px;font-weight:800;letter-spacing:-0.04em;color:#F5F7F4;">${escapeHtml(opts.tenantName)}</span>
+    </div>
+    <div style="background:#0F1C17;border:1px solid rgba(255,255,255,0.14);border-radius:12px;padding:32px;">
+      <h1 style="margin:0 0 16px;font-size:22px;font-weight:700;letter-spacing:-0.02em;color:#F5F7F4;">${escapeHtml(opts.subject)}</h1>
+      ${greetingName ? `<p style="margin:0 0 16px;color:#C4CDC7;">Hi ${escapeHtml(greetingName)},</p>` : ""}
+      <div style="color:#C4CDC7;font-size:15px;line-height:1.7;">${rendered}</div>
+    </div>
+    <p style="margin:20px 0 0;color:#5A6A62;font-size:11px;text-align:center;">
+      Sent by ${escapeHtml(opts.tenantName)} via KickNScream · Reply to this email to respond directly.
+    </p>
+  </div>
+</body></html>`;
+
+  await resend.emails.send({
+    from: env.EMAIL_FROM,
+    to: opts.to,
+    subject: opts.subject,
+    html,
+    text: opts.bodyMarkdown,
+  });
+}
+
+function renderMarkdownToInlineHtml(raw: string): string {
+  const escaped = escapeHtml(raw);
+  const lines = escaped.split(/\n/);
+  const out: string[] = [];
+  let inList = false;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const bulletMatch = /^[-*]\s+(.+)/.exec(trimmed);
+    if (bulletMatch) {
+      if (!inList) {
+        out.push('<ul style="margin:8px 0;padding-left:20px;">');
+        inList = true;
+      }
+      out.push(`<li style="margin:4px 0;">${inlineFormat(bulletMatch[1])}</li>`);
+      continue;
+    }
+    if (inList) {
+      out.push("</ul>");
+      inList = false;
+    }
+    if (trimmed === "") {
+      out.push("<br>");
+    } else {
+      out.push(`<p style="margin:8px 0;">${inlineFormat(trimmed)}</p>`);
+    }
+  }
+  if (inList) out.push("</ul>");
+  return out.join("");
+}
+
+function inlineFormat(s: string): string {
+  return s
+    .replace(/\*\*(.+?)\*\*/g, '<strong style="color:#F5F7F4;">$1</strong>')
+    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    .replace(/`(.+?)`/g, '<code style="background:rgba(255,255,255,0.08);padding:2px 4px;border-radius:3px;font-family:ui-monospace,monospace;">$1</code>');
+}
