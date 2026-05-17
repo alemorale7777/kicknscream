@@ -103,7 +103,7 @@ export default async function EventDetailPage({
     <div className="max-w-5xl space-y-8">
       <div>
         <Link
-          href={`/t/${slug}/schedule`}
+          href={`/t/${slug}/coach/schedule`}
           className="inline-flex items-center gap-1.5 text-sm text-ink-500 hover:text-ink-50 transition-colors"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
@@ -157,7 +157,7 @@ export default async function EventDetailPage({
             <h2 className="text-xl font-bold tracking-[-0.02em] mt-1">Who&apos;s here?</h2>
           </div>
           <Button variant="outline" size="sm" asChild>
-            <Link href={`/t/${slug}/roster`}>
+            <Link href={`/t/${slug}/coach/roster`}>
               <UsersIcon className="h-3.5 w-3.5" />
               Manage roster
             </Link>

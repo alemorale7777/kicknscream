@@ -69,7 +69,7 @@ export async function inviteMemberAction(input: z.infer<typeof inviteSchema>) {
     acceptUrl: getInvitationUrl(token),
   });
 
-  revalidatePath(`/t/${tenant.slug}/settings/team`);
+  revalidatePath(`/t/${tenant.slug}/coach/settings/team`);
 }
 
 export async function revokeInvitationAction(tenantId: string, invitationId: string) {
@@ -81,7 +81,7 @@ export async function revokeInvitationAction(tenantId: string, invitationId: str
   }
   await db.invitation.delete({ where: { id: invitationId } });
   const tenant = await db.tenant.findUnique({ where: { id: tenantId } });
-  if (tenant) revalidatePath(`/t/${tenant.slug}/settings/team`);
+  if (tenant) revalidatePath(`/t/${tenant.slug}/coach/settings/team`);
 }
 
 export async function removeMemberAction(tenantId: string, userId: string) {
@@ -103,7 +103,7 @@ export async function removeMemberAction(tenantId: string, userId: string) {
   }
   await db.membership.delete({ where: { userId_tenantId: { userId, tenantId } } });
   const tenant = await db.tenant.findUnique({ where: { id: tenantId } });
-  if (tenant) revalidatePath(`/t/${tenant.slug}/settings/team`);
+  if (tenant) revalidatePath(`/t/${tenant.slug}/coach/settings/team`);
 }
 
 export async function acceptInvitationAction(token: string) {
@@ -116,7 +116,7 @@ export async function acceptInvitationAction(token: string) {
   });
   if (!invite) throw new Error("Invitation not found");
   if (invite.acceptedAt) {
-    redirect(`/t/${invite.tenant.slug}/dashboard`);
+    redirect(`/t/${invite.tenant.slug}/coach/dashboard`);
   }
   if (invite.expiresAt < new Date()) throw new Error("This invitation has expired");
   if (invite.email.toLowerCase() !== user.email?.toLowerCase()) {
@@ -135,5 +135,5 @@ export async function acceptInvitationAction(token: string) {
     }),
   ]);
 
-  redirect(`/t/${invite.tenant.slug}/dashboard`);
+  redirect(`/t/${invite.tenant.slug}/coach/dashboard`);
 }

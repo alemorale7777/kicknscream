@@ -150,7 +150,7 @@ export function RosterList({
                     <AvatarFallback>{getInitials(`${p.firstName} ${p.lastName}`)}</AvatarFallback>
                   </Avatar>
 
-                  <Link href={`/t/${tenantSlug}/roster/${p.id}`} className="flex-1 min-w-0 block group/link">
+                  <Link href={`/t/${tenantSlug}/coach/roster/${p.id}`} className="flex-1 min-w-0 block group/link">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold text-ink-50 truncate">
                         {p.firstName} {p.lastName}

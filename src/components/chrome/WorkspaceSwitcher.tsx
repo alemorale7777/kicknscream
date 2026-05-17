@@ -13,6 +13,7 @@ import {
 import { ChevronsUpDown, Plus, Check, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { roleLabel } from "@/lib/roles";
+import { portalDefaultPath, defaultPortalForRole } from "@/lib/auth/portal";
 import type { TenantType, Role } from "@prisma/client";
 
 type Workspace = {
@@ -79,7 +80,7 @@ export function WorkspaceSwitcher({
         {workspaces.map((w) => (
           <DropdownMenuItem key={w.id} asChild>
             <Link
-              href={`/t/${w.slug}/dashboard`}
+              href={portalDefaultPath(w.slug, defaultPortalForRole(w.role))}
               className="flex justify-between items-center cursor-pointer gap-2"
             >
               <span className="flex items-center gap-2 truncate flex-1 min-w-0">

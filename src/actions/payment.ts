@@ -77,8 +77,8 @@ export async function recordPaymentAction(input: z.infer<typeof recordSchema>) {
       : []),
   ]);
 
-  revalidatePath(`/t/${membership.tenant.slug}/payments`);
-  revalidatePath(`/t/${membership.tenant.slug}/dashboard`);
+  revalidatePath(`/t/${membership.tenant.slug}/coach/payments`);
+  revalidatePath(`/t/${membership.tenant.slug}/coach/dashboard`);
 }
 
 const voidSchema = z.object({ tenantId: z.string(), invoiceId: z.string() });
@@ -87,7 +87,7 @@ export async function voidInvoiceAction(input: z.infer<typeof voidSchema>) {
   const { membership } = await assertCanManage(data.tenantId);
   if (!membership.tenant) throw new Error("Tenant not found");
   await db.invoice.update({ where: { id: data.invoiceId }, data: { status: "VOIDED" } });
-  revalidatePath(`/t/${membership.tenant.slug}/payments`);
+  revalidatePath(`/t/${membership.tenant.slug}/coach/payments`);
 }
 
 const reminderSchema = z.object({ tenantId: z.string(), invoiceId: z.string() });

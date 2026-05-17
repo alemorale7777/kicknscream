@@ -15,7 +15,7 @@ export function SideNav({ tenant }: { tenant: Tenant; role?: Role }) {
       <nav className="flex-1 p-4 space-y-1">
         {items.map((item) => {
           const active =
-            item.href === `/t/${tenant.slug}/dashboard`
+            item.href === `/t/${tenant.slug}/coach/dashboard`
               ? pathname === item.href
               : pathname?.startsWith(item.href);
           const Icon = item.icon;

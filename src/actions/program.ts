@@ -52,7 +52,7 @@ export async function createProgramAction(input: z.infer<typeof baseSchema>) {
     },
   });
 
-  revalidatePath(`/t/${membership.tenant.slug}/programs`);
+  revalidatePath(`/t/${membership.tenant.slug}/coach/programs`);
   revalidatePath(`/${membership.tenant.slug}`);
   revalidatePath(`/${membership.tenant.slug}/book`);
 }
@@ -79,7 +79,7 @@ export async function updateProgramAction(input: z.infer<typeof updateSchema>) {
     },
   });
 
-  revalidatePath(`/t/${membership.tenant.slug}/programs`);
+  revalidatePath(`/t/${membership.tenant.slug}/coach/programs`);
   revalidatePath(`/${membership.tenant.slug}`);
   revalidatePath(`/${membership.tenant.slug}/book`);
 }
@@ -88,7 +88,7 @@ export async function archiveProgramAction(tenantId: string, programId: string, 
   const { membership } = await assertCanManage(tenantId);
   if (!membership.tenant) throw new Error("Tenant not found");
   await db.program.update({ where: { id: programId }, data: { archived } });
-  revalidatePath(`/t/${membership.tenant.slug}/programs`);
+  revalidatePath(`/t/${membership.tenant.slug}/coach/programs`);
   revalidatePath(`/${membership.tenant.slug}`);
 }
 
@@ -103,6 +103,6 @@ export async function deleteProgramAction(tenantId: string, programId: string) {
     );
   }
   await db.program.delete({ where: { id: programId } });
-  revalidatePath(`/t/${membership.tenant.slug}/programs`);
+  revalidatePath(`/t/${membership.tenant.slug}/coach/programs`);
   revalidatePath(`/${membership.tenant.slug}`);
 }

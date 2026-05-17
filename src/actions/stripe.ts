@@ -54,8 +54,8 @@ export async function startStripeConnectOnboardingAction(tenantId: string) {
 
   const link = await stripe.accountLinks.create({
     account: stripeAccountId,
-    refresh_url: `${env.NEXTAUTH_URL}/t/${membership.tenant.slug}/settings/billing?refresh=1`,
-    return_url: `${env.NEXTAUTH_URL}/t/${membership.tenant.slug}/settings/billing?ok=1`,
+    refresh_url: `${env.NEXTAUTH_URL}/t/${membership.tenant.slug}/coach/settings/billing?refresh=1`,
+    return_url: `${env.NEXTAUTH_URL}/t/${membership.tenant.slug}/coach/settings/billing?ok=1`,
     type: "account_onboarding",
   });
 

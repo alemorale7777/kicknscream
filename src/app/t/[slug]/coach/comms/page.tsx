@@ -47,7 +47,7 @@ export default async function CommsPage({ params }: { params: Promise<{ slug: st
           </p>
           <div className="mt-5 flex flex-wrap gap-2 justify-center">
             <Button variant="primary" size="sm" asChild>
-              <Link href={`/t/${tenant.slug}/roster`} className="inline-flex items-center gap-2">
+              <Link href={`/t/${tenant.slug}/coach/roster`} className="inline-flex items-center gap-2">
                 Add players
                 <ArrowRight className="h-3.5 w-3.5" />
               </Link>

@@ -88,7 +88,7 @@ export function ScheduleClient({
   }
 
   function handleEventClick(e: EventWithLocation) {
-    router.push(`/t/${tenantSlug}/schedule/${e.id}`);
+    router.push(`/t/${tenantSlug}/coach/schedule/${e.id}`);
   }
 
   function handleCellClick(date: Date) {

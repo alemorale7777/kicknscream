@@ -27,7 +27,10 @@ export type NavItem = {
  * Order matters — first item is the active default on dashboard load.
  */
 export function navForTenantType(type: TenantType, slug = ":slug"): NavItem[] {
-  const base = `/t/${slug}`;
+  // Coach sidenav lives under the /coach portal segment. INSTITUTION and CLUB
+  // tenants currently share the same coach-portal nav structure — when those
+  // tenant types get their own portal pages, point base elsewhere.
+  const base = `/t/${slug}/coach`;
   switch (type) {
     case "COACH":
       return [
@@ -69,13 +72,13 @@ export const NEXT_STEP_BY_TYPE: Record<TenantType, { title: string; copy: string
     title: "Set up your booking page",
     copy: "Add your services and connect Stripe to start taking sessions. Parents can book in minutes.",
     cta: "Set up bookings",
-    href: (s) => `/t/${s}/bookings`,
+    href: (s) => `/t/${s}/coach/bookings`,
   },
   INSTITUTION: {
     title: "Create your first program",
     copy: "Spin up a class, camp, or clinic. Programs are how parents find and register for what you offer.",
     cta: "New program",
-    href: (s) => `/t/${s}/programs`,
+    href: (s) => `/t/${s}/coach/programs`,
   },
   CLUB: {
     title: "Build your first team",

@@ -75,7 +75,7 @@ export async function createTenantAction(input: CreateTenantInput) {
   });
 
   revalidatePath("/");
-  redirect(`/t/${tenant.slug}/dashboard`);
+  redirect(`/t/${tenant.slug}/coach/dashboard`);
 }
 
 const updateTenantSchema = z.object({
@@ -109,8 +109,8 @@ export async function updateTenantAction(input: z.infer<typeof updateTenantSchem
   });
 
   if (membership.tenant) {
-    revalidatePath(`/t/${membership.tenant.slug}/settings`);
-    revalidatePath(`/t/${membership.tenant.slug}/dashboard`);
+    revalidatePath(`/t/${membership.tenant.slug}/coach/settings`);
+    revalidatePath(`/t/${membership.tenant.slug}/coach/dashboard`);
   }
 }
 

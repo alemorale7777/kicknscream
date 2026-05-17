@@ -18,7 +18,7 @@ export default async function OnboardingPage({
   // If the user has memberships and didn't explicitly ask to create another,
   // bounce them to their first tenant's dashboard.
   if (user && user.memberships.length > 0 && sp.force !== "1") {
-    redirect(`/t/${user.memberships[0].tenant.slug}/dashboard`);
+    redirect(`/t/${user.memberships[0].tenant.slug}/coach/dashboard`);
   }
 
   return (
@@ -32,7 +32,7 @@ export default async function OnboardingPage({
         </Link>
         {user && user.memberships.length > 0 && (
           <Link
-            href={`/t/${user.memberships[0].tenant.slug}/dashboard`}
+            href={`/t/${user.memberships[0].tenant.slug}/coach/dashboard`}
             className="text-sm text-ink-500 hover:text-ink-50 transition-colors"
           >
             ← Back to dashboard

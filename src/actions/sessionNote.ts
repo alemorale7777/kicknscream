@@ -65,8 +65,8 @@ export async function createSessionNoteAction(input: z.infer<typeof createSchema
   }
 
   if (membership.tenant) {
-    revalidatePath(`/t/${membership.tenant.slug}/schedule/${data.eventId}`);
-    revalidatePath(`/t/${membership.tenant.slug}/dashboard`);
+    revalidatePath(`/t/${membership.tenant.slug}/coach/schedule/${data.eventId}`);
+    revalidatePath(`/t/${membership.tenant.slug}/coach/dashboard`);
   }
   return note;
 }
@@ -95,7 +95,7 @@ export async function updateSessionNoteAction(input: z.infer<typeof updateSchema
     },
   });
   if (membership.tenant) {
-    revalidatePath(`/t/${membership.tenant.slug}/schedule/${note.eventId}`);
+    revalidatePath(`/t/${membership.tenant.slug}/coach/schedule/${note.eventId}`);
   }
 }
 
@@ -108,6 +108,6 @@ export async function deleteSessionNoteAction(tenantId: string, noteId: string) 
   }
   await db.sessionNote.delete({ where: { id: noteId } });
   if (membership.tenant) {
-    revalidatePath(`/t/${membership.tenant.slug}/schedule/${note.eventId}`);
+    revalidatePath(`/t/${membership.tenant.slug}/coach/schedule/${note.eventId}`);
   }
 }

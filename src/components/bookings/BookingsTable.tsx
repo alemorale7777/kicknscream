@@ -284,8 +284,8 @@ export function BookingsTable({
               {table.getRowModel().rows.map((row) => {
                 const r = row.original;
                 const href = r.eventId
-                  ? `/t/${tenantSlug}/schedule/${r.eventId}`
-                  : `/t/${tenantSlug}/roster`;
+                  ? `/t/${tenantSlug}/coach/schedule/${r.eventId}`
+                  : `/t/${tenantSlug}/coach/roster`;
                 return (
                   <tr
                     key={row.id}

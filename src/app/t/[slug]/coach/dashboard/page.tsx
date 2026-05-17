@@ -180,7 +180,7 @@ async function renderOperatorDashboard(
       tone: "warn",
       title: `Confirm ${e.player.firstName} ${e.player.lastName}`,
       detail: `Pending in ${e.program.name}`,
-      href: `/t/${tenant.slug}/bookings`,
+      href: `/t/${tenant.slug}/coach/bookings`,
       cta: "Review",
     });
   }
@@ -191,7 +191,7 @@ async function renderOperatorDashboard(
       tone: "danger",
       title: `Overdue · ${formatCents(inv.amount)}`,
       detail: inv.payerEmail,
-      href: `/t/${tenant.slug}/payments`,
+      href: `/t/${tenant.slug}/coach/payments`,
       cta: "Chase",
     });
   }
@@ -254,7 +254,7 @@ async function renderOperatorDashboard(
               ? "No players yet"
               : `${playerCount === 1 ? "player" : "players"} registered`
           }
-          href={`/t/${tenant.slug}/roster`}
+          href={`/t/${tenant.slug}/coach/roster`}
           spark={rosterSpark}
           deltaPct={deltaPct(rosterCurrent, rosterPrior)}
         />
@@ -263,7 +263,7 @@ async function renderOperatorDashboard(
           label="This week"
           value={weekEventsCount.toString()}
           sublabel={weekEventsCount === 0 ? "No events scheduled" : "events upcoming"}
-          href={`/t/${tenant.slug}/schedule`}
+          href={`/t/${tenant.slug}/coach/schedule`}
           spark={eventsSpark}
           deltaPct={deltaPct(eventsCurrent, eventsPrior)}
         />
@@ -276,7 +276,7 @@ async function renderOperatorDashboard(
               ? "All caught up"
               : `${outstandingCount} ${outstandingCount === 1 ? "invoice" : "invoices"} open`
           }
-          href={`/t/${tenant.slug}/payments`}
+          href={`/t/${tenant.slug}/coach/payments`}
           tone={outstandingCents > 0 ? "warn" : "default"}
           spark={outstandingSpark.map((c) => c / 100)}
           deltaPct={deltaPct(outstandingCurrent, outstandingPrior)}
@@ -287,22 +287,22 @@ async function renderOperatorDashboard(
         <h3 className="text-sm uppercase tracking-wider text-ink-500">Quick links</h3>
         <div className="grid gap-3 sm:grid-cols-2">
           <QuickLink
-            href={`/t/${tenant.slug}/programs`}
+            href={`/t/${tenant.slug}/coach/programs`}
             title={tenant.type === "COACH" ? "Manage services" : "Manage programs"}
             desc={tenant.type === "COACH" ? "Pricing, packages, descriptions" : "Sessions, classes, camps"}
           />
           <QuickLink
-            href={`/t/${tenant.slug}/settings/team`}
+            href={`/t/${tenant.slug}/coach/settings/team`}
             title="Invite teammates"
             desc="Add admins, coaches, parents"
           />
           <QuickLink
-            href={`/t/${tenant.slug}/comms`}
+            href={`/t/${tenant.slug}/coach/comms`}
             title="Send a broadcast"
             desc="Email all parents at once"
           />
           <QuickLink
-            href={`/t/${tenant.slug}/settings/billing`}
+            href={`/t/${tenant.slug}/coach/settings/billing`}
             title="Billing"
             desc="Connect Stripe to accept payments"
           />
