@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
@@ -67,7 +67,7 @@ export function ProgramDialog({
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     reset,
     formState: { errors },
@@ -85,7 +85,8 @@ export function ProgramDialog({
     },
   });
 
-  const priceModel = watch("priceModel");
+  const priceModel = useWatch({ control, name: "priceModel" });
+  const skillLevelValue = useWatch({ control, name: "skillLevel" });
   const modelHint = PRICE_MODELS.find((m) => m.value === priceModel)?.hint;
 
   function onSubmit(data: FormData) {
@@ -187,7 +188,7 @@ export function ProgramDialog({
             <div className="space-y-1.5">
               <Label>Skill level</Label>
               <Select
-                value={watch("skillLevel") || ""}
+                value={skillLevelValue || ""}
                 onValueChange={(v) => setValue("skillLevel", v as SkillLevel | "")}
               >
                 <SelectTrigger>

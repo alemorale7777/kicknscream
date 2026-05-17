@@ -1,7 +1,6 @@
 import { requireTenant } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatCents } from "@/lib/utils";
 import { format, isPast } from "date-fns";

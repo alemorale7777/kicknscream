@@ -71,7 +71,8 @@ export function WeekView({
   }
 
   return (
-    <div className="rounded-lg border border-line bg-pitch-800 overflow-hidden">
+    <div className="rounded-lg border border-line bg-pitch-800 overflow-x-auto">
+      <div className="min-w-[680px]">
       {/* Day header strip */}
       <div className="grid grid-cols-[64px_repeat(7,minmax(0,1fr))] border-b border-line bg-pitch-900/40">
         <div className="p-2 text-[10px] uppercase tracking-wider text-ink-500 font-mono text-center">
@@ -185,6 +186,7 @@ export function WeekView({
         <span className="text-ink-500">
           {events.length} {events.length === 1 ? "event" : "events"} this week
         </span>
+      </div>
       </div>
     </div>
   );

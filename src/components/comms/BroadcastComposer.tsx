@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Card } from "@/components/ui/card";
@@ -49,7 +49,7 @@ export function BroadcastComposer({
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     formState: { errors },
   } = useForm<FormData>({
@@ -61,10 +61,10 @@ export function BroadcastComposer({
     },
   });
 
-  const audience = watch("audience");
-  const subject = watch("subject");
-  const body = watch("body");
-  const programId = watch("programId");
+  const audience = useWatch({ control, name: "audience" });
+  const subject = useWatch({ control, name: "subject" });
+  const body = useWatch({ control, name: "body" });
+  const programId = useWatch({ control, name: "programId" });
 
   function applyTemplate(t: Template) {
     setValue("subject", t.subject, { shouldValidate: true });

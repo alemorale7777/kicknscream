@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Card } from "@/components/ui/card";
@@ -62,13 +62,13 @@ export function TeamManager({
     handleSubmit,
     reset,
     setValue,
-    watch,
+    control,
     formState: { errors },
   } = useForm<InviteForm>({
     resolver: zodResolver(inviteSchema),
     defaultValues: { role: "COACH" },
   });
-  const role = watch("role");
+  const role = useWatch({ control, name: "role" });
 
   return (
     <div className="space-y-8">

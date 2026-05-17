@@ -6,7 +6,6 @@ import { ChalkGrid, Floodlight } from "@/components/brand/ChalkGrid";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { formatCents } from "@/lib/utils";
 import { CheckCircle2, Clock, Mail } from "lucide-react";
 

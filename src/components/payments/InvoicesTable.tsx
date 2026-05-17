@@ -168,7 +168,6 @@ export function InvoicesTable({
           <div className="space-y-2">
             {filtered.map((i) => {
               const tone = STATUS_TONE[i.status];
-              const Icon = tone.icon;
               const owed = balance(i);
               const overdue = i.status === "SENT" && isPast(i.createdAt);
               const effectiveTone = overdue ? STATUS_TONE.OVERDUE : tone;

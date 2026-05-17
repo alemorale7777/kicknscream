@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
@@ -89,7 +89,7 @@ export function EventDialog({
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     reset,
     formState: { errors },
@@ -109,8 +109,9 @@ export function EventDialog({
     },
   });
 
-  const type = watch("type");
-  const recurrenceEnabled = watch("recurrenceEnabled");
+  const type = useWatch({ control, name: "type" });
+  const recurrenceEnabled = useWatch({ control, name: "recurrenceEnabled" });
+  const locationIdValue = useWatch({ control, name: "locationId" });
 
   function onSubmit(data: FormData) {
     startTransition(async () => {
@@ -220,7 +221,7 @@ export function EventDialog({
               <div className="space-y-1.5">
                 <Label>Location</Label>
                 <Select
-                  value={watch("locationId") ?? ""}
+                  value={locationIdValue ?? ""}
                   onValueChange={(v) => setValue("locationId", v)}
                 >
                   <SelectTrigger>

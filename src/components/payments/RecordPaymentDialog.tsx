@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
@@ -66,7 +66,7 @@ export function RecordPaymentDialog({
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     reset,
     formState: { errors },
@@ -80,7 +80,7 @@ export function RecordPaymentDialog({
     },
   });
 
-  const method = watch("method");
+  const method = useWatch({ control, name: "method" });
 
   function onSubmit(data: FormData) {
     startTransition(async () => {

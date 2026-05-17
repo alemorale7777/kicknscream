@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Card } from "@/components/ui/card";
@@ -51,7 +51,7 @@ export function BookingForm({ tenantSlug, program }: { tenantSlug: string; progr
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     formState: { errors },
   } = useForm<FormData>({
@@ -62,7 +62,7 @@ export function BookingForm({ tenantSlug, program }: { tenantSlug: string; progr
     },
   });
 
-  const watchedTime = watch("startTime");
+  const watchedTime = useWatch({ control, name: "startTime" });
 
   function pickTime(t: string) {
     setSelectedTime(t);
@@ -110,7 +110,7 @@ export function BookingForm({ tenantSlug, program }: { tenantSlug: string; progr
           <p className="text-xs text-ink-500">Coach availability is confirmed after you submit.</p>
         </header>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label htmlFor="date">Date</Label>
             <Input
@@ -168,7 +168,7 @@ export function BookingForm({ tenantSlug, program }: { tenantSlug: string; progr
           <h2 className="text-xl font-bold tracking-[-0.02em]">Parent details</h2>
         </header>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label htmlFor="parentName">Parent name</Label>
             <Input id="parentName" {...register("parentName")} placeholder="Jamie Lopez" />
@@ -194,7 +194,7 @@ export function BookingForm({ tenantSlug, program }: { tenantSlug: string; progr
           <h2 className="text-xl font-bold tracking-[-0.02em]">Who&apos;s playing?</h2>
         </header>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label htmlFor="playerFirstName">First name</Label>
             <Input id="playerFirstName" {...register("playerFirstName")} />
