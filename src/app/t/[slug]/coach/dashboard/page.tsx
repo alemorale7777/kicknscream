@@ -184,6 +184,38 @@ async function renderOperatorDashboard(
 
   // Build needs-attention list
   const attentionItems: AttentionItem[] = [];
+
+  // Stripe Connect — only surface if the tenant has at least one non-free
+  // program (otherwise there's nothing to charge for and the prompt is noise).
+  const hasPaidProgram = await db.program.count({
+    where: { tenantId: tenant.id, archived: false, priceModel: { not: "FREE" } },
+  });
+  if (hasPaidProgram > 0 && !tenant.stripeAccountId) {
+    attentionItems.push({
+      id: "stripe:disconnected",
+      icon: "money",
+      tone: "info",
+      title: "Connect Stripe to get paid",
+      detail: "You have paid programs but no payout account connected",
+      href: `/t/${tenant.slug}/admin/billing`,
+      cta: "Connect",
+    });
+  } else if (
+    tenant.stripeAccountId &&
+    tenant.stripeRequirementsDueAt &&
+    !tenant.stripePayoutsEnabled
+  ) {
+    attentionItems.push({
+      id: "stripe:requirements",
+      icon: "warn",
+      tone: "warn",
+      title: "Stripe needs documents",
+      detail: "Payouts are paused until you finish onboarding",
+      href: `/t/${tenant.slug}/admin/billing`,
+      cta: "Finish",
+    });
+  }
+
   for (const e of pendingEnrollments) {
     attentionItems.push({
       id: `enrollment:${e.id}`,
