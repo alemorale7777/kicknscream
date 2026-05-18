@@ -88,7 +88,13 @@ export function ScheduleClient({
   }
 
   function handleEventClick(e: EventWithLocation) {
-    router.push(`/t/${tenantSlug}/coach/schedule/${e.id}`);
+    if (!canEdit) {
+      router.push(`/t/${tenantSlug}/coach/schedule/${e.id}`);
+      return;
+    }
+    setEditingEvent(e);
+    setDefaultRange(undefined);
+    setDialogOpen(true);
   }
 
   function handleCellClick(date: Date) {
@@ -231,7 +237,9 @@ export function ScheduleClient({
       </div>
 
       <EventDialog
+        key={editingEvent?.id ?? "new"}
         tenantId={tenantId}
+        tenantSlug={tenantSlug}
         event={editingEvent}
         defaultStart={defaultRange?.start}
         defaultEnd={defaultRange?.end}

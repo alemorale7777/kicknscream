@@ -58,6 +58,52 @@ const bulkSchema = z.object({
   playerIds: z.array(z.string()),
 });
 
+/**
+ * Server-loader for the event side-drawer roster section. Returns the same
+ * shape AttendanceList expects: program-enrolled players, with their status
+ * overridden by any existing Attendance row for this event.
+ */
+export async function loadEventAttendanceAction(tenantId: string, eventId: string) {
+  await assertCanMark(tenantId);
+  const event = await db.event.findUnique({
+    where: { id: eventId },
+    select: { id: true, tenantId: true, programId: true },
+  });
+  if (!event || event.tenantId !== tenantId) {
+    throw new Error("Event not found");
+  }
+
+  const [enrollments, existing] = await Promise.all([
+    event.programId
+      ? db.enrollment.findMany({
+          where: { programId: event.programId, status: { in: ["ACTIVE", "PENDING"] } },
+          include: { player: { select: { id: true, firstName: true, lastName: true } } },
+        })
+      : Promise.resolve([]),
+    db.attendance.findMany({
+      where: { eventId: event.id },
+      include: { player: { select: { id: true, firstName: true, lastName: true } } },
+    }),
+  ]);
+
+  const map = new Map<
+    string,
+    {
+      player: { id: string; firstName: string; lastName: string };
+      status: AttendanceStatus | "PENDING";
+    }
+  >();
+  for (const e of enrollments) {
+    map.set(e.player.id, { player: e.player, status: "PENDING" });
+  }
+  for (const a of existing) {
+    map.set(a.player.id, { player: a.player, status: a.status });
+  }
+  return Array.from(map.values()).sort((a, b) =>
+    a.player.lastName.localeCompare(b.player.lastName)
+  );
+}
+
 export async function bulkMarkAttendanceAction(input: z.infer<typeof bulkSchema>) {
   const data = bulkSchema.parse(input);
   const { user, membership } = await assertCanMark(data.tenantId);

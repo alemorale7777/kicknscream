@@ -1,20 +1,23 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import Link from "next/link";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -23,10 +26,32 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { createEventAction, updateEventAction, deleteEventAction } from "@/actions/event";
+import {
+  createEventAction,
+  updateEventAction,
+  deleteEventAction,
+} from "@/actions/event";
+import {
+  loadEventAttendanceAction,
+  markAttendanceAction,
+  bulkMarkAttendanceAction,
+} from "@/actions/attendance";
 import { ALL_EVENT_TYPES, EVENT_TONE } from "@/lib/eventTone";
-import { Loader2, Trash2, Repeat } from "lucide-react";
-import type { Event, EventType, Location } from "@prisma/client";
+import { cn, getInitials } from "@/lib/utils";
+import {
+  Loader2,
+  Trash2,
+  Repeat,
+  ExternalLink,
+  Check,
+  X,
+  Clock,
+  MinusCircle,
+  AlertCircle,
+  Users,
+  AlertTriangle,
+} from "lucide-react";
+import type { AttendanceStatus, Event, EventType, Location } from "@prisma/client";
 
 const eventTypeEnum = z.enum([
   "LESSON",
@@ -62,8 +87,27 @@ function combineDateTime(dateStr: string, timeStr: string) {
   return new Date(`${dateStr}T${timeStr}:00`);
 }
 
+type AttendanceEntry = {
+  player: { id: string; firstName: string; lastName: string };
+  status: AttendanceStatus | "PENDING";
+};
+
+const STATUS_CONFIG: Record<
+  AttendanceStatus | "PENDING",
+  { label: string; short: string; icon: typeof Check; tone: string }
+> = {
+  PRESENT: { label: "Present", short: "P", icon: Check, tone: "text-turf-300" },
+  LATE: { label: "Late", short: "L", icon: Clock, tone: "text-warn" },
+  ABSENT: { label: "Absent", short: "A", icon: X, tone: "text-danger" },
+  EXCUSED: { label: "Excused", short: "E", icon: MinusCircle, tone: "text-ink-300" },
+  PENDING: { label: "—", short: "?", icon: AlertCircle, tone: "text-ink-500" },
+};
+
+const CYCLE: AttendanceStatus[] = ["PRESENT", "LATE", "ABSENT", "EXCUSED"];
+
 export function EventDialog({
   tenantId,
+  tenantSlug,
   event,
   defaultStart,
   defaultEnd,
@@ -72,6 +116,7 @@ export function EventDialog({
   onOpenChange,
 }: {
   tenantId: string;
+  tenantSlug?: string;
   event?: Event;
   defaultStart?: Date;
   defaultEnd?: Date;
@@ -84,7 +129,7 @@ export function EventDialog({
   const end = event?.endsAt ?? defaultEnd ?? new Date(start.getTime() + 60 * 60 * 1000);
 
   const [pending, startTransition] = useTransition();
-  const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const {
     register,
@@ -164,8 +209,6 @@ export function EventDialog({
 
   function handleDelete() {
     if (!event) return;
-    if (!confirm(`Delete "${event.title}"? This removes it from the schedule.`)) return;
-    setDeleting(true);
     startTransition(async () => {
       try {
         await deleteEventAction(tenantId, event.id);
@@ -173,183 +216,408 @@ export function EventDialog({
         onOpenChange(false);
       } catch (e) {
         toast.error((e as Error).message);
-      } finally {
-        setDeleting(false);
       }
     });
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl">
-        <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit event" : "New event"}</DialogTitle>
-          <DialogDescription>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent>
+        <SheetHeader>
+          <SheetTitle>{isEdit ? "Edit event" : "New event"}</SheetTitle>
+          <SheetDescription>
             {isEdit
-              ? "Update the event details."
-              : "Add an event to the schedule. Set a recurrence to scaffold a whole season."}
-          </DialogDescription>
-        </DialogHeader>
+              ? "Update details, take attendance, or remove this event."
+              : "Add an event to the schedule. Recurrence scaffolds a whole season."}
+          </SheetDescription>
+        </SheetHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="title">Title</Label>
-            <Input id="title" {...register("title")} placeholder="U10 Tuesday Skills" autoFocus />
-            {errors.title && <p className="text-xs text-danger">{errors.title.message}</p>}
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
+        <SheetBody>
+          <form id="event-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-1.5">
-              <Label>Type</Label>
-              <Select value={type} onValueChange={(v) => setValue("type", v as EventType)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ALL_EVENT_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      <span className="inline-flex items-center gap-2">
-                        <span className={`h-2 w-2 rounded-full ${EVENT_TONE[t].dot}`} />
-                        {EVENT_TONE[t].label}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="title">Title</Label>
+              <Input id="title" {...register("title")} placeholder="U10 Tuesday Skills" autoFocus />
+              {errors.title && <p className="text-xs text-danger">{errors.title.message}</p>}
             </div>
-            {locations.length > 0 && (
+
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>Location</Label>
-                <Select
-                  value={locationIdValue ?? ""}
-                  onValueChange={(v) => setValue("locationId", v)}
-                >
+                <Label>Type</Label>
+                <Select value={type} onValueChange={(v) => setValue("type", v as EventType)}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Pick a location" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {locations.map((l) => (
-                      <SelectItem key={l.id} value={l.id}>
-                        {l.name}
+                    {ALL_EVENT_TYPES.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        <span className="inline-flex items-center gap-2">
+                          <span className={`h-2 w-2 rounded-full ${EVENT_TONE[t].dot}`} />
+                          {EVENT_TONE[t].label}
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1.5 col-span-3 sm:col-span-1">
-              <Label htmlFor="date">Date</Label>
-              <Input id="date" type="date" {...register("date")} className="font-mono" />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="startTime">Start</Label>
-              <Input id="startTime" type="time" {...register("startTime")} className="font-mono" />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="endTime">End</Label>
-              <Input id="endTime" type="time" {...register("endTime")} className="font-mono" />
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="capacity">Capacity (optional)</Label>
-            <Input
-              id="capacity"
-              type="number"
-              inputMode="numeric"
-              min={1}
-              max={2000}
-              {...register("capacity")}
-              placeholder="Max players for this event"
-              className="font-mono"
-            />
-          </div>
-
-          {!isEdit && (
-            <div className="rounded-md border border-line bg-pitch-700/30 p-4 space-y-3">
-              <label className="flex items-start gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  {...register("recurrenceEnabled")}
-                  className="mt-0.5 rounded border-line bg-pitch-700 text-turf-400 focus:ring-turf-400/30"
-                />
-                <span className="flex-1">
-                  <span className="flex items-center gap-2 font-medium text-ink-50">
-                    <Repeat className="h-4 w-4 text-turf-300" />
-                    Repeat this event
-                  </span>
-                  <span className="block text-xs text-ink-500 mt-0.5">
-                    Scaffolds the whole season in one go. Each occurrence is editable individually.
-                  </span>
-                </span>
-              </label>
-              {recurrenceEnabled && (
-                <div className="grid grid-cols-2 gap-3 pl-6">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="recurrenceIntervalDays">Every (days)</Label>
-                    <Input
-                      id="recurrenceIntervalDays"
-                      type="number"
-                      min={1}
-                      max={90}
-                      {...register("recurrenceIntervalDays")}
-                      className="font-mono"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="recurrenceCount">Total occurrences</Label>
-                    <Input
-                      id="recurrenceCount"
-                      type="number"
-                      min={1}
-                      max={52}
-                      {...register("recurrenceCount")}
-                      className="font-mono"
-                    />
-                  </div>
+              {locations.length > 0 && (
+                <div className="space-y-1.5">
+                  <Label>Location</Label>
+                  <Select
+                    value={locationIdValue ?? ""}
+                    onValueChange={(v) => setValue("locationId", v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pick a location" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {locations.map((l) => (
+                        <SelectItem key={l.id} value={l.id}>
+                          {l.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1.5 col-span-3 sm:col-span-1">
+                <Label htmlFor="date">Date</Label>
+                <Input id="date" type="date" {...register("date")} className="font-mono" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="startTime">Start</Label>
+                <Input id="startTime" type="time" {...register("startTime")} className="font-mono" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="endTime">End</Label>
+                <Input id="endTime" type="time" {...register("endTime")} className="font-mono" />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="capacity">Capacity (optional)</Label>
+              <Input
+                id="capacity"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={2000}
+                {...register("capacity")}
+                placeholder="Max players for this event"
+                className="font-mono"
+              />
+            </div>
+
+            {!isEdit && (
+              <div className="rounded-md border border-line bg-pitch-700/30 p-4 space-y-3">
+                <label className="flex items-start gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    {...register("recurrenceEnabled")}
+                    className="mt-0.5 rounded border-line bg-pitch-700 text-turf-400 focus:ring-turf-400/30"
+                  />
+                  <span className="flex-1">
+                    <span className="flex items-center gap-2 font-medium text-ink-50">
+                      <Repeat className="h-4 w-4 text-turf-300" />
+                      Repeat this event
+                    </span>
+                    <span className="block text-xs text-ink-500 mt-0.5">
+                      Scaffolds the whole season in one go. Each occurrence is editable individually.
+                    </span>
+                  </span>
+                </label>
+                {recurrenceEnabled && (
+                  <div className="grid grid-cols-2 gap-3 pl-6">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="recurrenceIntervalDays">Every (days)</Label>
+                      <Input
+                        id="recurrenceIntervalDays"
+                        type="number"
+                        min={1}
+                        max={90}
+                        {...register("recurrenceIntervalDays")}
+                        className="font-mono"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="recurrenceCount">Total occurrences</Label>
+                      <Input
+                        id="recurrenceCount"
+                        type="number"
+                        min={1}
+                        max={52}
+                        {...register("recurrenceCount")}
+                        className="font-mono"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </form>
+
+          {isEdit && event && (
+            <div className="mt-6 pt-6 border-t border-line">
+              <RosterPanel tenantId={tenantId} eventId={event.id} open={open} />
+              {tenantSlug && (
+                <Link
+                  href={`/t/${tenantSlug}/coach/schedule/${event.id}`}
+                  className="mt-4 inline-flex items-center gap-1.5 text-xs text-ink-500 hover:text-ink-50 transition-colors"
+                  onClick={() => onOpenChange(false)}
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  Open full event page · session notes
+                </Link>
               )}
             </div>
           )}
 
-          <DialogFooter className="pt-2 flex sm:justify-between gap-2">
-            {isEdit ? (
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={handleDelete}
-                disabled={pending || deleting}
-                className="text-danger hover:bg-danger/10"
-              >
-                <Trash2 className="h-4 w-4" />
-                {deleting ? "Deleting…" : "Delete"}
-              </Button>
-            ) : (
-              <span />
-            )}
-            <div className="flex items-center gap-2">
-              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={pending}>
-                Cancel
-              </Button>
-              <Button type="submit" variant="primary" disabled={pending}>
-                {pending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Saving…
-                  </>
-                ) : isEdit ? (
-                  "Save"
-                ) : (
-                  "Create event"
-                )}
-              </Button>
+          {isEdit && confirmingDelete && (
+            <div className="mt-6 rounded-md border border-danger/40 bg-danger/10 p-4 space-y-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-danger mt-0.5 shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium text-ink-50">Delete &ldquo;{event?.title}&rdquo;?</p>
+                  <p className="text-xs text-ink-500 mt-0.5">
+                    Removes it from the schedule, including attendance and any notes. This can&apos;t be undone.
+                  </p>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setConfirmingDelete(false)}
+                  disabled={pending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleDelete}
+                  disabled={pending}
+                  className="bg-danger text-pitch-950 hover:bg-danger/90"
+                >
+                  {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                  Delete event
+                </Button>
+              </div>
             </div>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+          )}
+        </SheetBody>
+
+        <SheetFooter>
+          {isEdit && !confirmingDelete ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setConfirmingDelete(true)}
+              disabled={pending}
+              className="text-danger hover:bg-danger/10"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </Button>
+          ) : (
+            <span />
+          )}
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={pending}>
+              Cancel
+            </Button>
+            <Button form="event-form" type="submit" variant="primary" disabled={pending}>
+              {pending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Saving…
+                </>
+              ) : isEdit ? (
+                "Save"
+              ) : (
+                "Create event"
+              )}
+            </Button>
+          </div>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+/**
+ * Inline roster + quick-attendance section shown inside the side drawer.
+ * Loads fresh on open, then mutates in place via markAttendanceAction.
+ * Tap a row to cycle Present → Late → Absent → Excused.
+ */
+function RosterPanel({
+  tenantId,
+  eventId,
+  open,
+}: {
+  tenantId: string;
+  eventId: string;
+  open: boolean;
+}) {
+  type LoadState =
+    | { kind: "idle" }
+    | { kind: "loaded"; entries: AttendanceEntry[] }
+    | { kind: "error"; message: string };
+  const [state, setState] = useState<LoadState>({ kind: "idle" });
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const [, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    loadEventAttendanceAction(tenantId, eventId)
+      .then((rows) => {
+        if (!cancelled) setState({ kind: "loaded", entries: rows });
+      })
+      .catch((e) => {
+        if (!cancelled) setState({ kind: "error", message: (e as Error).message });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, tenantId, eventId]);
+
+  const entries = state.kind === "loaded" ? state.entries : null;
+  const loading = state.kind === "idle";
+  const error = state.kind === "error" ? state.message : null;
+
+  function setEntries(updater: (prev: AttendanceEntry[]) => AttendanceEntry[]) {
+    setState((s) => (s.kind === "loaded" ? { kind: "loaded", entries: updater(s.entries) } : s));
+  }
+
+  function cycle(playerId: string, current: AttendanceStatus | "PENDING") {
+    const idx = current === "PENDING" ? -1 : CYCLE.indexOf(current as AttendanceStatus);
+    const next = CYCLE[(idx + 1) % CYCLE.length];
+    setStatus(playerId, next);
+  }
+
+  function setStatus(playerId: string, status: AttendanceStatus) {
+    setEntries((prev) => prev.map((e) => (e.player.id === playerId ? { ...e, status } : e)));
+    setPendingIds((s) => new Set(s).add(playerId));
+    startTransition(async () => {
+      try {
+        await markAttendanceAction({ tenantId, eventId, playerId, status });
+      } catch (e) {
+        toast.error((e as Error).message);
+      } finally {
+        setPendingIds((s) => {
+          const next = new Set(s);
+          next.delete(playerId);
+          return next;
+        });
+      }
+    });
+  }
+
+  function markAllPresent() {
+    if (!entries || entries.length === 0) return;
+    const playerIds = entries.map((e) => e.player.id);
+    setEntries((prev) => prev.map((e) => ({ ...e, status: "PRESENT" })));
+    startTransition(async () => {
+      try {
+        await bulkMarkAttendanceAction({
+          tenantId,
+          eventId,
+          status: "PRESENT",
+          playerIds,
+        });
+        toast.success("All marked present");
+      } catch (e) {
+        toast.error((e as Error).message);
+      }
+    });
+  }
+
+  const presentCount = entries?.filter((e) => e.status === "PRESENT" || e.status === "LATE").length ?? 0;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-[0.2em] text-ink-500">Roster</p>
+          <p className="text-sm font-semibold text-ink-50 mt-0.5 inline-flex items-center gap-2">
+            <Users className="h-3.5 w-3.5 text-ink-500" />
+            {entries ? `${entries.length} player${entries.length === 1 ? "" : "s"}` : "—"}
+            {entries && entries.length > 0 && (
+              <Badge variant="outline" className="border-turf-400/30 text-turf-300">
+                {presentCount}/{entries.length} here
+              </Badge>
+            )}
+          </p>
+        </div>
+        {entries && entries.length > 0 && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={markAllPresent}
+            className="border-turf-400/40 text-turf-300 hover:bg-turf-400/10"
+          >
+            <Check className="h-3.5 w-3.5" />
+            Mark all present
+          </Button>
+        )}
+      </div>
+
+      {loading && (
+        <div className="text-xs text-ink-500 inline-flex items-center gap-1.5">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Loading roster…
+        </div>
+      )}
+      {error && <p className="text-xs text-danger">{error}</p>}
+
+      {entries && entries.length === 0 && !loading && (
+        <p className="text-xs text-ink-500">
+          No one enrolled yet. When parents book this event&apos;s program, they show up here.
+        </p>
+      )}
+
+      {entries && entries.length > 0 && (
+        <ul className="space-y-1.5">
+          {entries.map((entry) => {
+            const cfg = STATUS_CONFIG[entry.status];
+            const Icon = cfg.icon;
+            const isPending = pendingIds.has(entry.player.id);
+            return (
+              <li key={entry.player.id}>
+                <button
+                  type="button"
+                  onClick={() => cycle(entry.player.id, entry.status)}
+                  disabled={isPending}
+                  className={cn(
+                    "w-full flex items-center gap-3 rounded-md border px-3 py-2 text-left transition-all duration-[120ms] active:scale-[0.99]",
+                    "border-line bg-pitch-700/30 hover:bg-pitch-700/60",
+                    entry.status === "PRESENT" && "border-turf-400/30 bg-turf-400/5",
+                    entry.status === "LATE" && "border-warn/30 bg-warn/5",
+                    entry.status === "ABSENT" && "border-danger/30 bg-danger/5"
+                  )}
+                >
+                  <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-pitch-800 text-xs font-mono text-ink-300">
+                    {getInitials(`${entry.player.firstName} ${entry.player.lastName}`)}
+                  </span>
+                  <span className="flex-1 min-w-0 text-sm font-medium truncate">
+                    {entry.player.firstName} {entry.player.lastName}
+                  </span>
+                  <span className={cn("inline-flex items-center gap-1 text-xs font-medium uppercase tracking-wider", cfg.tone)}>
+                    <Icon className="h-3.5 w-3.5" />
+                    {cfg.label}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
   );
 }
