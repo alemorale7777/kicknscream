@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { PlayerDialog } from "./PlayerDialog";
+import { RosterImportSheet } from "./RosterImportSheet";
 import { deletePlayerAction } from "@/actions/player";
 import { getInitials } from "@/lib/utils";
 import { differenceInYears, format } from "date-fns";
@@ -22,6 +23,7 @@ import {
   Mail,
   Loader2,
   CalendarDays,
+  Upload,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -49,6 +51,7 @@ export function RosterList({
 }) {
   const [query, setQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState<PlayerWithParent | undefined>(undefined);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
@@ -119,10 +122,16 @@ export function RosterList({
             />
           </div>
           {canEdit && (
-            <Button variant="primary" onClick={openCreate}>
-              <Plus className="h-4 w-4" />
-              Add player
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setImportOpen(true)}>
+                <Upload className="h-4 w-4" />
+                Import CSV
+              </Button>
+              <Button variant="primary" onClick={openCreate}>
+                <Plus className="h-4 w-4" />
+                Add player
+              </Button>
+            </div>
           )}
         </div>
 
@@ -227,6 +236,13 @@ export function RosterList({
           if (!v) setEditingPlayer(undefined);
         }}
         showClubFields={showClubFields}
+      />
+
+      <RosterImportSheet
+        key={importOpen ? "open" : "closed"}
+        tenantId={tenantId}
+        open={importOpen}
+        onOpenChange={setImportOpen}
       />
     </>
   );
