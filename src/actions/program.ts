@@ -142,7 +142,11 @@ export async function createProgramAction(input: z.infer<typeof baseSchema>) {
   const { membership } = await assertCanManage(data.tenantId);
   if (!membership.tenant) throw new Error("Tenant not found");
 
-  const priceCents = Math.round(data.priceDollars * 100);
+  // FREE always saves as $0 regardless of what the client form posted.
+  // The dialog disables but doesn't clear the price input, so a coach
+  // switching PER_SESSION→FREE with a lingering "60" in the box used
+  // to save a $60 FREE program. Force zero here as the source of truth.
+  const priceCents = data.priceModel === "FREE" ? 0 : Math.round(data.priceDollars * 100);
 
   const created = await db.program.create({
     data: {
@@ -194,7 +198,8 @@ export async function updateProgramAction(input: z.infer<typeof updateSchema>) {
     where: { id: data.id },
     select: { stripePriceId: true, stripeProductId: true },
   });
-  const priceCents = Math.round(data.priceDollars * 100);
+  // FREE always saves as $0 — mirror of createProgramAction.
+  const priceCents = data.priceModel === "FREE" ? 0 : Math.round(data.priceDollars * 100);
 
   const stripeIds = await syncStripeRecurringPrice({
     stripeAccountId: membership.tenant.stripeAccountId,

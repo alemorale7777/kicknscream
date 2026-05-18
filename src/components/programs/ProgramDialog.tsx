@@ -150,7 +150,19 @@ export function ProgramDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Price model</Label>
-              <Select value={priceModel} onValueChange={(v) => setValue("priceModel", v as PriceModel)}>
+              <Select
+                value={priceModel}
+                onValueChange={(v) => {
+                  const next = v as PriceModel;
+                  setValue("priceModel", next);
+                  // Keep the visible price in sync with the model — FREE
+                  // forces $0, so the form can't claim $60 with FREE
+                  // selected.
+                  if (next === "FREE") {
+                    setValue("priceDollars", "0");
+                  }
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
