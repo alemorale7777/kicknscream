@@ -63,7 +63,9 @@ export function TryoutPipeline({
   signups: TryoutSignup[];
 }) {
   const [query, setQuery] = useState("");
-  const [ageFilter, setAgeFilter] = useState<string>("");
+  // Radix Select forbids empty-string values — sentinel for "all ages".
+  const ALL_AGES = "__all";
+  const [ageFilter, setAgeFilter] = useState<string>(ALL_AGES);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
@@ -75,7 +77,7 @@ export function TryoutPipeline({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return signups.filter((s) => {
-      if (ageFilter && s.ageGroup !== ageFilter) return false;
+      if (ageFilter !== ALL_AGES && s.ageGroup !== ageFilter) return false;
       if (!q) return true;
       return (
         s.playerName.toLowerCase().includes(q) ||
@@ -139,7 +141,7 @@ export function TryoutPipeline({
             <SelectValue placeholder="All ages" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All ages</SelectItem>
+            <SelectItem value={ALL_AGES}>All ages</SelectItem>
             {ageGroups.map((g) => (
               <SelectItem key={g} value={g}>
                 {g}

@@ -212,8 +212,10 @@ function NoteComposer({
   playerId: string;
   categories: string[];
 }) {
+  // Radix Select forbids empty-string values — sentinel for "no category".
+  const NO_CATEGORY = "__none";
   const [content, setContent] = useState("");
-  const [category, setCategory] = useState<string>("");
+  const [category, setCategory] = useState<string>(NO_CATEGORY);
   const [rating, setRating] = useState<number | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -227,7 +229,7 @@ function NoteComposer({
         await createDevelopmentNoteAction({
           tenantId,
           playerId,
-          category: category || undefined,
+          category: category === NO_CATEGORY ? undefined : category,
           rating,
           content,
         });
@@ -255,7 +257,7 @@ function NoteComposer({
               <SelectValue placeholder="Pick a focus area" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">No category</SelectItem>
+              <SelectItem value={NO_CATEGORY}>No category</SelectItem>
               {categories.map((c) => (
                 <SelectItem key={c} value={c}>
                   {c}

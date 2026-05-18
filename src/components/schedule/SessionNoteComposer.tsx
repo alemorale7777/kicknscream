@@ -39,8 +39,11 @@ export function SessionNoteComposer({
   programName?: string;
   eventTitle?: string;
 }) {
+  // Radix Select forbids empty-string values — use a sentinel for the
+  // "no player" option and translate to null when submitting.
+  const NO_PLAYER = "__none";
   const [content, setContent] = useState("");
-  const [playerId, setPlayerId] = useState<string>(players[0]?.id ?? "");
+  const [playerId, setPlayerId] = useState<string>(players[0]?.id ?? NO_PLAYER);
   const [visibleToParent, setVisibleToParent] = useState(true);
   const [tab, setTab] = useState<"write" | "preview">("write");
   const [pending, startTransition] = useTransition();
@@ -52,7 +55,8 @@ export function SessionNoteComposer({
       toast.error("Jot a few rough notes first — even three words works.");
       return;
     }
-    const selectedPlayer = players.find((p) => p.id === playerId);
+    const selectedPlayer =
+      playerId === NO_PLAYER ? null : players.find((p) => p.id === playerId);
     const playerName = selectedPlayer
       ? `${selectedPlayer.firstName} ${selectedPlayer.lastName}`
       : undefined;
@@ -104,17 +108,18 @@ export function SessionNoteComposer({
       toast.error("Note is too short");
       return;
     }
+    const resolvedPlayerId = playerId === NO_PLAYER ? null : playerId;
     startTransition(async () => {
       try {
         await createSessionNoteAction({
           tenantId,
           eventId,
-          playerId: playerId || null,
+          playerId: resolvedPlayerId,
           content,
           visibleToParent,
         });
         toast.success(
-          visibleToParent && playerId
+          visibleToParent && resolvedPlayerId
             ? "Note saved · parent emailed"
             : "Note saved"
         );
@@ -227,7 +232,7 @@ Supports **bold**, *italic*, and bullet lists with - dashes."
               <SelectValue placeholder="General note (no player)" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">General note (no player)</SelectItem>
+              <SelectItem value={NO_PLAYER}>General note (no player)</SelectItem>
               {players.map((p) => (
                 <SelectItem key={p.id} value={p.id}>
                   {p.firstName} {p.lastName}
