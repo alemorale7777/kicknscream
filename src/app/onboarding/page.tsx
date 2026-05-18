@@ -4,6 +4,10 @@ import { ChalkGrid, Floodlight } from "@/components/brand/ChalkGrid";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/tenant";
 import { redirect } from "next/navigation";
+import {
+  defaultPortalForRole,
+  portalDefaultPath,
+} from "@/lib/auth/portal";
 
 export const metadata = { title: "Create your tenant" };
 
@@ -16,10 +20,22 @@ export default async function OnboardingPage({
   const user = await getCurrentUser();
 
   // If the user has memberships and didn't explicitly ask to create another,
-  // bounce them to their first tenant's dashboard.
+  // bounce them to the portal that matches their role (parents → family,
+  // operators → coach, owners → admin). Hardcoding /coach/dashboard 403s
+  // parents who signed in via magic link as a booked-only member.
   if (user && user.memberships.length > 0 && sp.force !== "1") {
-    redirect(`/t/${user.memberships[0].tenant.slug}/coach/dashboard`);
+    const first = user.memberships[0];
+    const portal = defaultPortalForRole(first.role);
+    redirect(portalDefaultPath(first.tenant.slug, portal));
   }
+
+  const backHref =
+    user && user.memberships.length > 0
+      ? portalDefaultPath(
+          user.memberships[0].tenant.slug,
+          defaultPortalForRole(user.memberships[0].role)
+        )
+      : null;
 
   return (
     <main className="relative min-h-screen bg-pitch-900 overflow-hidden">
@@ -30,9 +46,9 @@ export default async function OnboardingPage({
         <Link href="/" className="hover:opacity-80 transition-opacity">
           <Wordmark size="md" />
         </Link>
-        {user && user.memberships.length > 0 && (
+        {backHref && (
           <Link
-            href={`/t/${user.memberships[0].tenant.slug}/coach/dashboard`}
+            href={backHref}
             className="text-sm text-ink-500 hover:text-ink-50 transition-colors"
           >
             ← Back to dashboard
