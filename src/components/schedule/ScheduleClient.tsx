@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -48,6 +48,22 @@ export function ScheduleClient({
   const router = useRouter();
   const [view, setView] = useState<ViewMode>("week");
   const [anchorDate, setAnchorDate] = useState<Date>(new Date());
+
+  // Mobile-first default: bump to day view post-hydration if the viewport
+  // is narrower than md. Done in a microtask so React Compiler's
+  // set-state-in-effect rule is satisfied and there's no hydration mismatch.
+  useEffect(() => {
+    Promise.resolve()
+      .then(() =>
+        typeof window !== "undefined" &&
+        window.matchMedia("(max-width: 767px)").matches
+          ? "day"
+          : null
+      )
+      .then((next) => {
+        if (next) setView(next);
+      });
+  }, []);
   const [activeFilters, setActiveFilters] = useState<Set<EventType>>(new Set(ALL_EVENT_TYPES));
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventWithLocation | undefined>();

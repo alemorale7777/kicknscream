@@ -262,48 +262,107 @@ export function BookingsTable({
           </p>
         </Card>
       ) : (
-        <Card className="overflow-x-auto p-0">
-          <table className="min-w-full text-sm">
-            <thead>
-              {table.getHeaderGroups().map((hg) => (
-                <tr key={hg.id} className="border-b border-line bg-pitch-900/40">
-                  {hg.headers.map((h) => (
-                    <th
-                      key={h.id}
-                      className="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-ink-500 font-medium"
-                    >
-                      {h.isPlaceholder
-                        ? null
-                        : flexRender(h.column.columnDef.header, h.getContext())}
-                    </th>
-                  ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody>
-              {table.getRowModel().rows.map((row) => {
-                const r = row.original;
-                const href = r.eventId
-                  ? `/t/${tenantSlug}/coach/schedule/${r.eventId}`
-                  : `/t/${tenantSlug}/coach/roster`;
-                return (
-                  <tr
-                    key={row.id}
-                    className="border-b border-line/40 last:border-0 hover:bg-pitch-800/60 transition-colors duration-[120ms]"
-                  >
-                    {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="px-4 py-2.5 align-middle">
-                        <Link href={href} className="block">
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </Link>
-                      </td>
+        <>
+          {/* md+ — sortable table view. */}
+          <Card className="hidden md:block overflow-x-auto p-0">
+            <table className="min-w-full text-sm">
+              <thead>
+                {table.getHeaderGroups().map((hg) => (
+                  <tr key={hg.id} className="border-b border-line bg-pitch-900/40">
+                    {hg.headers.map((h) => (
+                      <th
+                        key={h.id}
+                        className="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-ink-500 font-medium"
+                      >
+                        {h.isPlaceholder
+                          ? null
+                          : flexRender(h.column.columnDef.header, h.getContext())}
+                      </th>
                     ))}
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </Card>
+                ))}
+              </thead>
+              <tbody>
+                {table.getRowModel().rows.map((row) => {
+                  const r = row.original;
+                  const href = r.eventId
+                    ? `/t/${tenantSlug}/coach/schedule/${r.eventId}`
+                    : `/t/${tenantSlug}/coach/roster`;
+                  return (
+                    <tr
+                      key={row.id}
+                      className="border-b border-line/40 last:border-0 hover:bg-pitch-800/60 transition-colors duration-[120ms]"
+                    >
+                      {row.getVisibleCells().map((cell) => (
+                        <td key={cell.id} className="px-4 py-2.5 align-middle">
+                          <Link href={href} className="block">
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </Link>
+                        </td>
+                      ))}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </Card>
+
+          {/* sm — card stack. Each row becomes a tap-target card. */}
+          <div className="md:hidden space-y-2">
+            {table.getRowModel().rows.map((row) => {
+              const r = row.original;
+              const href = r.eventId
+                ? `/t/${tenantSlug}/coach/schedule/${r.eventId}`
+                : `/t/${tenantSlug}/coach/roster`;
+              const meta = STATUS_META[r.status];
+              return (
+                <Link
+                  key={row.id}
+                  href={href}
+                  className="block rounded-lg border border-line bg-pitch-800 p-3 transition-colors hover:border-turf-400/40"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-ink-50 truncate">
+                        {r.playerName || "—"}
+                      </p>
+                      <p className="text-xs text-ink-500 truncate">
+                        {r.programName}
+                      </p>
+                    </div>
+                    {meta && (
+                      <Badge
+                        variant="outline"
+                        className={cn("shrink-0", meta.border, meta.tone, meta.bg)}
+                      >
+                        {meta.label}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-xs text-ink-500 gap-2 flex-wrap">
+                    {r.parentEmail && (
+                      <span className="inline-flex items-center gap-1 truncate min-w-0">
+                        <Mail className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{r.parentEmail}</span>
+                      </span>
+                    )}
+                    {r.amount !== null && r.amount > 0 && (
+                      <span className="font-mono text-flood-400 shrink-0">
+                        {formatCents(r.amount)}
+                      </span>
+                    )}
+                  </div>
+                  {r.eventStart && (
+                    <div className="mt-1 text-xs text-ink-500 inline-flex items-center gap-1">
+                      <CalendarIcon className="h-3 w-3" />
+                      {format(new Date(r.eventStart), "MMM d, h:mm a")}
+                    </div>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        </>
       )}
 
       <div className="flex items-center justify-between text-xs text-ink-500">

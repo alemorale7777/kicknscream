@@ -176,16 +176,25 @@
   100% { background-position: 200% 0; }
 }
 
-/* Sheet (side drawer) — slide from right + fade-in backdrop */
+/* Sheet — overlay fade + content slide. Direction depends on viewport: at
+   md+ the drawer slides in from the right; below md it rises from the
+   bottom as a 90vh bottom sheet. */
 @keyframes sheet-overlay-in  { from { opacity: 0; } to { opacity: 1; } }
 @keyframes sheet-overlay-out { from { opacity: 1; } to { opacity: 0; } }
-@keyframes sheet-slide-in    { from { transform: translateX(100%); } to { transform: translateX(0); } }
-@keyframes sheet-slide-out   { from { transform: translateX(0); } to { transform: translateX(100%); } }
+@keyframes sheet-slide-up-in    { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes sheet-slide-up-out   { from { transform: translateY(0); } to { transform: translateY(100%); } }
+@keyframes sheet-slide-right-in  { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes sheet-slide-right-out { from { transform: translateX(0); } to { transform: translateX(100%); } }
 
 [data-sheet-overlay][data-state="open"]  { animation: sheet-overlay-in  180ms var(--ease-snap) both; }
 [data-sheet-overlay][data-state="closed"] { animation: sheet-overlay-out 140ms var(--ease-snap) both; }
-[data-sheet-content][data-state="open"]   { animation: sheet-slide-in    220ms var(--ease-snap) both; }
-[data-sheet-content][data-state="closed"] { animation: sheet-slide-out   180ms var(--ease-snap) both; }
+[data-sheet-content][data-state="open"]   { animation: sheet-slide-up-in    220ms var(--ease-snap) both; }
+[data-sheet-content][data-state="closed"] { animation: sheet-slide-up-out   180ms var(--ease-snap) both; }
+
+@media (min-width: 768px) {
+  [data-sheet-content][data-state="open"]   { animation: sheet-slide-right-in    220ms var(--ease-snap) both; }
+  [data-sheet-content][data-state="closed"] { animation: sheet-slide-right-out   180ms var(--ease-snap) both; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   [data-sheet-overlay][data-state],

@@ -33,12 +33,14 @@ const SheetContent = React.forwardRef<
       ref={ref}
       data-sheet-content=""
       className={cn(
-        "fixed inset-y-0 right-0 z-50 flex h-full w-full max-w-[480px] flex-col",
-        "bg-pitch-800 shadow-2xl shadow-pitch-950/60",
-        // Inside-edge hairline: a 1px pitch-700 line just inside the dimmed
-        // overlay lifts the drawer from the backdrop without competing with
-        // the strong shadow.
-        "border-l border-line ring-1 ring-inset ring-pitch-700/60",
+        // Under 768px the sheet anchors to the bottom edge as a 90vh bottom
+        // sheet — easier thumb reach on phones, lines up with mobile
+        // conventions for action drawers. At md+ it slides in from the right
+        // as a 480px-wide side drawer.
+        "fixed z-50 flex flex-col bg-pitch-800 shadow-2xl shadow-pitch-950/60",
+        "inset-x-0 bottom-0 h-[90vh] max-h-[90vh] rounded-t-xl border-t border-line",
+        "md:inset-y-0 md:right-0 md:left-auto md:bottom-auto md:h-full md:max-h-full md:w-full md:max-w-[480px] md:rounded-none md:border-t-0 md:border-l",
+        "ring-1 ring-inset ring-pitch-700/60",
         "focus:outline-none",
         className
       )}
