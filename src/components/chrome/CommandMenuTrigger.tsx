@@ -33,18 +33,22 @@ type ActionGroup = {
 };
 
 function actionsFor(slug: string, type: TenantType): ActionGroup[] {
-  const base = `/t/${slug}`;
+  // Portal-scoped under /coach/* — all operator UI lives there after the
+  // Phase B route split.
+  const base = `/t/${slug}/coach`;
   const navigation: ActionGroup = {
     label: "Navigation",
     items: [
       { label: "Dashboard", href: `${base}/dashboard`, icon: LayoutDashboard, keywords: ["home"] },
       { label: "Schedule", href: `${base}/schedule`, icon: Calendar, keywords: ["calendar", "events"] },
-      { label: "Roster", href: `${base}/roster`, icon: Users, keywords: ["players"] },
+      { label: "Players", href: `${base}/roster`, icon: Users, keywords: ["roster"] },
       { label: "Bookings", href: `${base}/bookings`, icon: ClipboardList, keywords: ["registrations"] },
-      { label: "Programs", href: `${base}/programs`, icon: GraduationCap, keywords: ["services"] },
+      { label: "Services", href: `${base}/programs`, icon: GraduationCap, keywords: ["programs"] },
       { label: "Payments", href: `${base}/payments`, icon: Wallet, keywords: ["invoices", "money"] },
-      { label: "Comms", href: `${base}/comms`, icon: MessageSquare, keywords: ["email", "broadcast"] },
-      { label: "Settings", href: `${base}/settings`, icon: Settings, keywords: ["billing", "team"] },
+      { label: "Messages", href: `${base}/messages`, icon: MessageSquare, keywords: ["email", "broadcast", "threads"] },
+      { label: "Notes", href: `${base}/notes`, icon: ClipboardList, keywords: ["session notes", "writeups"] },
+      { label: "Reports", href: `${base}/reports`, icon: Trophy, keywords: ["kpi", "metrics"] },
+      { label: "Settings", href: `${base}/settings`, icon: Settings, keywords: ["billing", "team", "branding"] },
     ],
   };
   if (type === "CLUB") {
@@ -58,8 +62,8 @@ function actionsFor(slug: string, type: TenantType): ActionGroup[] {
     items: [
       { label: "Add a player", href: `${base}/roster?new=1`, icon: Plus, keywords: ["create"] },
       { label: "New event", href: `${base}/schedule?new=1`, icon: Plus, keywords: ["create"] },
-      { label: "New program", href: `${base}/programs?new=1`, icon: Plus, keywords: ["create", "service"] },
-      { label: "Send broadcast", href: `${base}/comms`, icon: Wand2, keywords: ["email"] },
+      { label: "New service", href: `${base}/programs?new=1`, icon: Plus, keywords: ["create", "program"] },
+      { label: "Send broadcast", href: `${base}/messages?new=broadcast`, icon: Wand2, keywords: ["email"] },
       { label: "View public page", href: `/${slug}`, icon: ExternalLink, keywords: ["public", "preview"] },
     ],
   };
