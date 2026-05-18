@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { TopNav } from "@/components/chrome/TopNav";
 import { SideNav } from "@/components/chrome/SideNav";
 import { Identify } from "@/components/analytics/Identify";
+import { MobileFab } from "@/components/chrome/MobileFab";
+import { canManageTenant } from "@/lib/roles";
 import { db } from "@/lib/db";
 import type { Tenant, User, Role } from "@prisma/client";
 
@@ -40,6 +42,7 @@ export async function CoachShell({
         />
         <main className="flex-1 min-h-[calc(100vh-64px)] p-5 lg:p-10">{children}</main>
       </div>
+      {canManageTenant(role) && <MobileFab tenantSlug={tenant.slug} />}
     </div>
   );
 }
