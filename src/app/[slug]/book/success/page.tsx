@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatCents } from "@/lib/utils";
 import { CheckCircle2, Clock, Mail } from "lucide-react";
+import { BookingCompletedBeacon } from "@/components/analytics/BookingCompletedBeacon";
 
 export const metadata = { title: "Booking confirmed" };
 
@@ -33,6 +34,11 @@ export default async function BookingSuccessPage({
 
   return (
     <main className="relative min-h-screen bg-pitch-900 overflow-hidden">
+      <BookingCompletedBeacon
+        invoiceId={invoice?.id ?? null}
+        amountCents={invoice?.amount ?? null}
+        pending={isPending}
+      />
       <ChalkGrid />
       <Floodlight />
       <header className="relative z-10 flex items-center justify-between p-5 lg:px-12 border-b border-line backdrop-blur-sm">

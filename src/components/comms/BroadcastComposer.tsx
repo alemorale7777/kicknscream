@@ -86,6 +86,12 @@ export function BroadcastComposer({
           subject: data.subject,
           body: data.body,
         });
+        import("@/lib/analytics").then(({ track }) =>
+          track("broadcast_sent", {
+            audience: data.audience,
+            recipientCount: result.sent,
+          })
+        );
         toast.success(`Sent to ${result.sent}/${result.totalAudience} recipients`);
       } catch (e) {
         toast.error((e as Error).message);

@@ -149,6 +149,9 @@ function SignRow({
         });
         setSigned(true);
         setSignedMeta({ name: name.trim(), at: new Date().toISOString() });
+        import("@/lib/analytics").then(({ track }) =>
+          track("waiver_signed", { waiverId: row.waiverId, playerId: row.playerId })
+        );
         toast.success(`Signed for ${row.playerName}`);
       } catch (e) {
         toast.error((e as Error).message);

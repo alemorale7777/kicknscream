@@ -56,6 +56,9 @@ export function AttendanceList({
       prev.map((e) => (e.player.id === playerId ? { ...e, status } : e))
     );
     setPendingIds((s) => new Set(s).add(playerId));
+    import("@/lib/analytics").then(({ track }) =>
+      track("attendance_marked", { eventId, status })
+    );
     startTransition(async () => {
       try {
         await markAttendanceAction({ tenantId, eventId, playerId, status });

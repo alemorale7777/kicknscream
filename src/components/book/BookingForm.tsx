@@ -111,6 +111,15 @@ export function BookingForm({
   }
 
   function onSubmit(data: FormData) {
+    // Funnel-level telemetry — fire at submit-click so we capture even
+    // bookings that fail at the server.
+    import("@/lib/analytics").then(({ track }) =>
+      track("booking_started", {
+        programId: program.id,
+        priceModel: program.priceModel,
+        priceCents: program.price,
+      })
+    );
     startTransition(async () => {
       try {
         await createBookingAction({
