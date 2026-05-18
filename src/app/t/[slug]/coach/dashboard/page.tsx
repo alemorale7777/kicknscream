@@ -85,7 +85,18 @@ async function renderOperatorDashboard(
   ] = await Promise.all([
     db.event.findMany({
       where: { tenantId: tenant.id, startsAt: { gte: dayStart, lte: dayEnd } },
-      include: { location: true },
+      include: {
+        location: true,
+        attendances: { select: { id: true } },
+        program: {
+          select: {
+            enrollments: {
+              where: { status: { in: ["ACTIVE", "CONFIRMED", "PAID"] } },
+              select: { playerId: true },
+            },
+          },
+        },
+      },
       orderBy: { startsAt: "asc" },
     }),
     db.event.count({

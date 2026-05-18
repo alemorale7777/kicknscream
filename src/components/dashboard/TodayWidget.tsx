@@ -1,12 +1,26 @@
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { EVENT_TONE, toneChipStyle } from "@/lib/eventTone";
 import { format, isPast } from "date-fns";
-import { Calendar, Clock, MapPin, ArrowRight, CheckCircle2 } from "lucide-react";
+import {
+  Calendar,
+  Clock,
+  MapPin,
+  ArrowRight,
+  CheckCircle2,
+  AlertCircle,
+} from "lucide-react";
 import type { Event, Location } from "@prisma/client";
 
-type EventWithLocation = Event & { location?: Location | null };
+type EventWithLocation = Event & {
+  location?: Location | null;
+  // Optional — only the dashboard variant passes these; legacy callers
+  // (e.g. SchedulePage shells) won't.
+  attendances?: { id: string }[];
+  program?: { enrollments: { playerId: string }[] } | null;
+};
 
 export function TodayWidget({
   tenantSlug,
@@ -117,6 +131,40 @@ function EventRow({
               done
             </span>
           )}
+          {(() => {
+            const enrolled = event.program?.enrollments.length ?? 0;
+            const marked = event.attendances?.length ?? 0;
+            if (enrolled === 0) return null;
+            if (done && marked === 0) {
+              return (
+                <Badge
+                  variant="outline"
+                  className="border-warn/40 text-warn bg-warn/5 text-[10px]"
+                >
+                  <AlertCircle className="h-3 w-3 mr-0.5" />
+                  Attendance needed
+                </Badge>
+              );
+            }
+            if (done && marked < enrolled) {
+              return (
+                <Badge
+                  variant="outline"
+                  className="border-warn/30 text-warn bg-warn/5 text-[10px]"
+                >
+                  {marked}/{enrolled} marked
+                </Badge>
+              );
+            }
+            if (!done && enrolled > 0) {
+              return (
+                <span className="text-[10px] text-ink-500 font-mono">
+                  {enrolled} {enrolled === 1 ? "player" : "players"}
+                </span>
+              );
+            }
+            return null;
+          })()}
         </div>
         <div className="flex items-center gap-3 text-xs text-ink-500 mt-1">
           <span className="inline-flex items-center gap-1">
