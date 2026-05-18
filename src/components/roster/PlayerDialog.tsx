@@ -5,13 +5,14 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Input, Textarea } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -104,18 +105,23 @@ export function PlayerDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit player" : "Add player"}</DialogTitle>
-          <DialogDescription>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent>
+        <SheetHeader>
+          <SheetTitle>{isEdit ? "Edit player" : "Add player"}</SheetTitle>
+          <SheetDescription>
             {isEdit
               ? "Update player details. Parent linking syncs to the team roster."
               : "Roster a new player. We'll link the parent automatically if their email already has an account."}
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <SheetBody>
+        <form
+          id="player-form"
+          onSubmit={handleSubmit(onSubmit)}
+          className="space-y-4"
+        >
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="firstName">First name</Label>
@@ -195,25 +201,27 @@ export function PlayerDialog({
             />
           </div>
 
-          <DialogFooter className="pt-2">
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={pending}>
-              Cancel
-            </Button>
-            <Button type="submit" variant="primary" disabled={pending}>
-              {pending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {isEdit ? "Saving…" : "Adding…"}
-                </>
-              ) : isEdit ? (
-                "Save changes"
-              ) : (
-                "Add player"
-              )}
-            </Button>
-          </DialogFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+        </SheetBody>
+
+        <SheetFooter>
+          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={pending}>
+            Cancel
+          </Button>
+          <Button form="player-form" type="submit" variant="primary" disabled={pending}>
+            {pending ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {isEdit ? "Saving…" : "Adding…"}
+              </>
+            ) : isEdit ? (
+              "Save changes"
+            ) : (
+              "Add player"
+            )}
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
