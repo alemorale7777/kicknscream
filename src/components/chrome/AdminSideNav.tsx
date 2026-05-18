@@ -44,3 +44,37 @@ export function AdminSideNav({ tenant }: { tenant: Tenant }) {
     </aside>
   );
 }
+
+/**
+ * Horizontal scrolling pill nav for /admin/* on mobile. Renders below
+ * the TopNav, sticky to the viewport. AdminSideNav stays desktop-only.
+ */
+export function AdminMobileNav({ tenant }: { tenant: Tenant }) {
+  const pathname = usePathname() ?? "";
+  return (
+    <nav className="lg:hidden sticky top-16 z-30 border-b border-line bg-pitch-900/85 backdrop-blur-md overflow-x-auto">
+      <div className="flex items-center gap-1 px-3 py-2 min-w-max">
+        {ITEMS.map((it) => {
+          const href = `/t/${tenant.slug}/admin/${it.segment}`;
+          const active = pathname.startsWith(href);
+          const Icon = it.icon;
+          return (
+            <Link
+              key={it.segment}
+              href={href}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs whitespace-nowrap transition-colors duration-[120ms]",
+                active
+                  ? "bg-pitch-700 text-ink-50 border border-flood-400/40"
+                  : "text-ink-500 border border-transparent hover:bg-pitch-800/60 hover:text-ink-300"
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              <span>{it.label}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
