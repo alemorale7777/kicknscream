@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import path from "node:path";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   // Lock turbopack to this project; user's parent dir has its own lockfile.
@@ -25,4 +26,13 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
 };
 
-export default nextConfig;
+// Sentry wrap — provides automatic server/edge instrumentation. Source-map
+// upload only happens when SENTRY_AUTH_TOKEN is present in the build env;
+// otherwise it's a no-op and stack traces fall back to minified output.
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  silent: !process.env.CI,
+  widenClientFileUpload: true,
+  disableLogger: true,
+});
