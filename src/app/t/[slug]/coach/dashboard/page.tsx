@@ -75,6 +75,7 @@ async function renderOperatorDashboard(
     todayEvents,
     weekEventsCount,
     playerCount,
+    programCount,
     openInvoicesAgg,
     playersForSpark,
     eventsForSpark,
@@ -91,6 +92,7 @@ async function renderOperatorDashboard(
       where: { tenantId: tenant.id, startsAt: { gte: now, lte: weekEnd } },
     }),
     db.player.count({ where: { tenantId: tenant.id } }),
+    db.program.count({ where: { tenantId: tenant.id, archived: false } }),
     db.invoice.aggregate({
       _sum: { amount: true },
       _count: true,
@@ -228,30 +230,13 @@ async function renderOperatorDashboard(
 
       <NeedsAttention items={attentionItems} />
 
-      {playerCount === 0 && (
-        <Card className="relative overflow-hidden">
-          <ChalkGrid className="opacity-40" />
-          <CardContent className="relative p-6 lg:p-10 flex flex-col lg:flex-row items-start lg:items-center gap-6">
-            <div
-              className={`h-16 w-16 rounded-lg ${tone.bg} ${tone.text} flex items-center justify-center ring-1 ${tone.ring} shrink-0`}
-            >
-              <Icon className="h-8 w-8" />
-            </div>
-            <div className="flex-1 space-y-2 min-w-0">
-              <h2 className="text-2xl lg:text-3xl font-bold tracking-[-0.02em] text-balance">
-                {next.title}
-              </h2>
-              <p className="text-ink-300 max-w-2xl text-pretty">{next.copy}</p>
-            </div>
-            <Button variant="accent" size="lg" asChild className="shrink-0">
-              <Link href={next.href(tenant.slug)} className="inline-flex items-center gap-2">
-                {next.cta}
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+      <SetupCard
+        tenant={tenant}
+        Icon={Icon}
+        tone={tone}
+        next={next}
+        programCount={programCount}
+      />
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard
@@ -322,6 +307,65 @@ async function renderOperatorDashboard(
         </div>
       </section>
     </div>
+  );
+}
+
+/**
+ * Onboarding hero. While the tenant is missing programs or Stripe, this
+ * renders as the floodlit hero card. Once both are in place it returns
+ * null so the dashboard isn't dominated by an obsolete CTA.
+ */
+function SetupCard({
+  tenant,
+  Icon,
+  tone,
+  next,
+  programCount,
+}: {
+  tenant: Tenant;
+  Icon: typeof UserIcon;
+  tone: { bg: string; text: string; ring: string };
+  next: { title: string; copy: string; cta: string; href: (slug: string) => string };
+  programCount: number;
+}) {
+  const hasProgram = programCount > 0;
+  const stripeReady = !!tenant.stripeAccountId && !!tenant.stripeChargesEnabled;
+  if (hasProgram && stripeReady) return null;
+
+  // Re-frame the CTA around the specific step still missing — programs
+  // first, then Stripe.
+  const step = !hasProgram
+    ? next
+    : {
+        title: "Connect Stripe to take payments",
+        copy: "Your services are listed but checkout isn't live yet. Connect your Stripe account to start collecting bookings online.",
+        cta: "Connect Stripe",
+        href: (s: string) => `/t/${s}/coach/settings/billing`,
+      };
+
+  return (
+    <Card className="relative overflow-hidden">
+      <ChalkGrid className="opacity-40" />
+      <CardContent className="relative p-6 lg:p-10 flex flex-col lg:flex-row items-start lg:items-center gap-6">
+        <div
+          className={`h-16 w-16 rounded-lg ${tone.bg} ${tone.text} flex items-center justify-center ring-1 ${tone.ring} shrink-0`}
+        >
+          <Icon className="h-8 w-8" />
+        </div>
+        <div className="flex-1 space-y-2 min-w-0">
+          <h2 className="text-2xl lg:text-3xl font-bold tracking-[-0.02em] text-balance">
+            {step.title}
+          </h2>
+          <p className="text-ink-300 max-w-2xl text-pretty">{step.copy}</p>
+        </div>
+        <Button variant="accent" size="lg" asChild className="shrink-0">
+          <Link href={step.href(tenant.slug)} className="inline-flex items-center gap-2">
+            {step.cta}
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 

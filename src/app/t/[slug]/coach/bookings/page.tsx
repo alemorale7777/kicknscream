@@ -1,6 +1,7 @@
 import { requireTenant } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import { BookingsTable, type BookingRow } from "@/components/bookings/BookingsTable";
+import { PageHeader } from "@/components/chrome/PageHeader";
 
 export const metadata = { title: "Bookings" };
 
@@ -68,18 +69,12 @@ export default async function BookingsPage({ params }: { params: Promise<{ slug:
 
   return (
     <div className="max-w-6xl space-y-6">
-      <header className="space-y-1">
-        <p className="text-sm uppercase tracking-[0.2em] text-ink-500">Bookings</p>
-        <div className="flex items-baseline gap-3 flex-wrap">
-          <h1 className="text-3xl lg:text-4xl font-bold tracking-[-0.03em]">
-            Incoming registrations
-          </h1>
-          <span className="text-ink-500 font-mono text-sm">{rows.length} total</span>
-        </div>
-        <p className="text-sm text-ink-500 mt-2">
-          Filter by status, search by player or parent. Click any row to open the event detail.
-        </p>
-      </header>
+      <PageHeader
+        eyebrow="Bookings"
+        title="Incoming registrations"
+        count={`${rows.length} total`}
+        description="Filter by status, search by player or parent. Click any row to open the event detail."
+      />
 
       <BookingsTable tenantSlug={tenant.slug} rows={rows} />
     </div>

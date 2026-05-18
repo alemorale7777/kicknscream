@@ -2,6 +2,7 @@ import { requireTenant } from "@/lib/tenant";
 import { canManageTenant } from "@/lib/roles";
 import { db } from "@/lib/db";
 import { RosterList } from "@/components/roster/RosterList";
+import { PageHeader } from "@/components/chrome/PageHeader";
 
 export const metadata = { title: "Roster" };
 
@@ -30,15 +31,11 @@ export default async function RosterPage({ params }: { params: Promise<{ slug: s
 
   return (
     <div className="max-w-5xl space-y-6">
-      <header className="space-y-1">
-        <p className="text-sm uppercase tracking-[0.2em] text-ink-500">Roster</p>
-        <div className="flex items-baseline gap-3">
-          <h1 className="text-3xl lg:text-4xl font-bold tracking-[-0.03em]">{tenant.name}</h1>
-          <span className="text-ink-500 font-mono text-sm">
-            {players.length} {players.length === 1 ? "player" : "players"}
-          </span>
-        </div>
-      </header>
+      <PageHeader
+        eyebrow="Roster"
+        title={tenant.name}
+        count={`${players.length} ${players.length === 1 ? "player" : "players"}`}
+      />
 
       <RosterList
         tenantId={tenant.id}
