@@ -24,6 +24,9 @@ import {
   Loader2,
   CalendarDays,
   Upload,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -49,23 +52,59 @@ export function RosterList({
   canEdit: boolean;
   showClubFields: boolean;
 }) {
+  type SortKey = "name" | "age" | "parent" | "jersey";
   const [query, setQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState<PlayerWithParent | undefined>(undefined);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [, startTransition] = useTransition();
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return players;
-    return players.filter((p) => {
-      const full = `${p.firstName} ${p.lastName}`.toLowerCase();
-      const parent = (p.parent?.name ?? p.parent?.email ?? "").toLowerCase();
-      const pos = (p.position ?? "").toLowerCase();
-      return full.includes(q) || parent.includes(q) || pos.includes(q);
+    const base = q
+      ? players.filter((p) => {
+          const full = `${p.firstName} ${p.lastName}`.toLowerCase();
+          const parent = (p.parent?.name ?? p.parent?.email ?? "").toLowerCase();
+          const pos = (p.position ?? "").toLowerCase();
+          return full.includes(q) || parent.includes(q) || pos.includes(q);
+        })
+      : players;
+
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...base].sort((a, b) => {
+      switch (sortKey) {
+        case "name": {
+          const av = `${a.lastName} ${a.firstName}`.toLowerCase();
+          const bv = `${b.lastName} ${b.firstName}`.toLowerCase();
+          return av.localeCompare(bv) * dir;
+        }
+        case "age":
+          return (a.dob.getTime() - b.dob.getTime()) * dir;
+        case "parent": {
+          const av = (a.parent?.name ?? a.parent?.email ?? "~").toLowerCase();
+          const bv = (b.parent?.name ?? b.parent?.email ?? "~").toLowerCase();
+          return av.localeCompare(bv) * dir;
+        }
+        case "jersey": {
+          const av = a.jerseyNumber ?? Number.POSITIVE_INFINITY;
+          const bv = b.jerseyNumber ?? Number.POSITIVE_INFINITY;
+          return (av - bv) * dir;
+        }
+      }
     });
-  }, [players, query]);
+  }, [players, query, sortKey, sortDir]);
+
+  function toggleSort(key: SortKey) {
+    if (key === sortKey) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
 
   function openCreate() {
     setEditingPlayer(undefined);
@@ -160,80 +199,223 @@ export function RosterList({
             <p className="text-xs text-ink-500 mt-1">Try a different search.</p>
           </Card>
         ) : (
-          <div className="space-y-2">
-            {filtered.map((p) => {
-              const age = differenceInYears(new Date(), p.dob);
-              const isPending = pendingId === p.id;
-              return (
-                <Card key={p.id} className="p-4 flex items-center gap-4 group transition-colors hover:border-turf-400/40">
-                  <Avatar className="h-11 w-11 shrink-0">
-                    <AvatarFallback>{getInitials(`${p.firstName} ${p.lastName}`)}</AvatarFallback>
-                  </Avatar>
-
-                  <Link href={`/t/${tenantSlug}/coach/roster/${p.id}`} className="flex-1 min-w-0 block group/link">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-semibold text-ink-50 truncate">
-                        {p.firstName} {p.lastName}
-                      </p>
-                      {showClubFields && p.jerseyNumber !== null && p.jerseyNumber !== undefined && (
-                        <span className="font-mono text-xs text-flood-400 bg-flood-400/10 border border-flood-400/30 rounded px-1.5 py-0.5">
-                          #{p.jerseyNumber}
-                        </span>
-                      )}
-                      {showClubFields && p.position && (
-                        <Badge variant="outline">{p.position}</Badge>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-ink-500 mt-1 flex-wrap">
-                      <span className="inline-flex items-center gap-1">
-                        <CalendarDays className="h-3 w-3" />
-                        Age {age}
-                      </span>
-                      <span className="text-ink-700">·</span>
-                      <span className="font-mono">{format(p.dob, "MMM d, yyyy")}</span>
-                      {p.parent && (
-                        <>
-                          <span className="text-ink-700">·</span>
-                          <span className="inline-flex items-center gap-1">
-                            <Mail className="h-3 w-3" />
-                            {p.parent.email}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  </Link>
-
-                  {canEdit && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="iconSm" aria-label="Player actions">
-                          {isPending ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
+          <>
+            {/* md+ — dense sortable table with sticky header.
+                Sticky offset (top-12) clears the page header stack so the
+                column row stays visible as a 60-row roster scrolls. */}
+            <div className="hidden md:block rounded-lg border border-line bg-pitch-800 overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 z-10 bg-pitch-800/95 backdrop-blur-sm">
+                  <tr className="border-b border-line">
+                    <SortHeader
+                      label="Name"
+                      active={sortKey === "name"}
+                      dir={sortDir}
+                      onClick={() => toggleSort("name")}
+                      className="w-full"
+                    />
+                    <SortHeader
+                      label="Age"
+                      active={sortKey === "age"}
+                      dir={sortDir}
+                      onClick={() => toggleSort("age")}
+                      align="left"
+                    />
+                    <SortHeader
+                      label="Parent"
+                      active={sortKey === "parent"}
+                      dir={sortDir}
+                      onClick={() => toggleSort("parent")}
+                    />
+                    {showClubFields && (
+                      <SortHeader
+                        label="#"
+                        active={sortKey === "jersey"}
+                        dir={sortDir}
+                        onClick={() => toggleSort("jersey")}
+                        align="left"
+                      />
+                    )}
+                    <th className="w-10" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((p) => {
+                    const age = differenceInYears(new Date(), p.dob);
+                    const isPending = pendingId === p.id;
+                    return (
+                      <tr
+                        key={p.id}
+                        className="border-b border-line/60 last:border-0 hover:bg-pitch-700/40 transition-colors group"
+                      >
+                        <td className="px-4 py-2.5">
+                          <Link
+                            href={`/t/${tenantSlug}/coach/roster/${p.id}`}
+                            className="flex items-center gap-3 min-w-0"
+                          >
+                            <Avatar className="h-8 w-8 shrink-0 bg-turf-400/15 text-turf-200">
+                              <AvatarFallback className="bg-transparent text-turf-200">
+                                {getInitials(`${p.firstName} ${p.lastName}`)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="flex-1 min-w-0">
+                              <span className="font-medium text-ink-50 truncate block">
+                                {p.firstName} {p.lastName}
+                              </span>
+                              {showClubFields && p.position && (
+                                <span className="text-xs text-ink-500 truncate block">
+                                  {p.position}
+                                </span>
+                              )}
+                            </span>
+                          </Link>
+                        </td>
+                        <td className="px-4 py-2.5 text-ink-300 font-mono tabular-nums whitespace-nowrap">
+                          {age}
+                        </td>
+                        <td className="px-4 py-2.5 text-ink-500 max-w-[260px]">
+                          {p.parent ? (
+                            <span className="inline-flex items-center gap-1.5 truncate">
+                              <Mail className="h-3 w-3 shrink-0" />
+                              <span className="truncate">{p.parent.email}</span>
+                            </span>
                           ) : (
-                            <MoreHorizontal className="h-4 w-4 text-ink-500" />
+                            <span className="text-ink-700">—</span>
                           )}
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-40">
-                        <DropdownMenuItem onClick={() => openEdit(p)} className="cursor-pointer">
-                          <Pencil className="h-4 w-4" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => handleDelete(p)}
-                          className="cursor-pointer text-danger focus:text-danger"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          Remove
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </Card>
-              );
-            })}
-          </div>
+                        </td>
+                        {showClubFields && (
+                          <td className="px-4 py-2.5 font-mono text-flood-400 tabular-nums whitespace-nowrap">
+                            {p.jerseyNumber !== null && p.jerseyNumber !== undefined
+                              ? `#${p.jerseyNumber}`
+                              : ""}
+                          </td>
+                        )}
+                        <td className="px-2 py-2.5 text-right">
+                          {canEdit && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="iconSm" aria-label="Player actions">
+                                  {isPending ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <MoreHorizontal className="h-4 w-4 text-ink-500" />
+                                  )}
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-40">
+                                <DropdownMenuItem
+                                  onClick={() => openEdit(p)}
+                                  className="cursor-pointer"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() => handleDelete(p)}
+                                  className="cursor-pointer text-danger focus:text-danger"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                  Remove
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* sm — keep the card layout so each row still has tap-friendly
+                affordances on small screens. */}
+            <div className="md:hidden space-y-2">
+              {filtered.map((p) => {
+                const age = differenceInYears(new Date(), p.dob);
+                const isPending = pendingId === p.id;
+                return (
+                  <Card
+                    key={p.id}
+                    className="p-4 flex items-center gap-4 group transition-colors hover:border-turf-400/40"
+                  >
+                    <Avatar className="h-11 w-11 shrink-0 bg-turf-400/15 text-turf-200">
+                      <AvatarFallback className="bg-transparent text-turf-200">
+                        {getInitials(`${p.firstName} ${p.lastName}`)}
+                      </AvatarFallback>
+                    </Avatar>
+
+                    <Link
+                      href={`/t/${tenantSlug}/coach/roster/${p.id}`}
+                      className="flex-1 min-w-0 block"
+                    >
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold text-ink-50 truncate">
+                          {p.firstName} {p.lastName}
+                        </p>
+                        {showClubFields &&
+                          p.jerseyNumber !== null &&
+                          p.jerseyNumber !== undefined && (
+                            <span className="font-mono text-xs text-flood-400 bg-flood-400/10 border border-flood-400/30 rounded px-1.5 py-0.5">
+                              #{p.jerseyNumber}
+                            </span>
+                          )}
+                        {showClubFields && p.position && (
+                          <Badge variant="outline">{p.position}</Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-ink-500 mt-1 flex-wrap">
+                        <span className="inline-flex items-center gap-1">
+                          <CalendarDays className="h-3 w-3" />
+                          Age {age}
+                        </span>
+                        <span className="text-ink-700">·</span>
+                        <span className="font-mono">{format(p.dob, "MMM d, yyyy")}</span>
+                        {p.parent && (
+                          <>
+                            <span className="text-ink-700">·</span>
+                            <span className="inline-flex items-center gap-1">
+                              <Mail className="h-3 w-3" />
+                              {p.parent.email}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </Link>
+
+                    {canEdit && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="iconSm" aria-label="Player actions">
+                            {isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <MoreHorizontal className="h-4 w-4 text-ink-500" />
+                            )}
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-40">
+                          <DropdownMenuItem onClick={() => openEdit(p)} className="cursor-pointer">
+                            <Pencil className="h-4 w-4" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => handleDelete(p)}
+                            className="cursor-pointer text-danger focus:text-danger"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Remove
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </Card>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
 
@@ -257,6 +439,41 @@ export function RosterList({
         onOpenChange={setImportOpen}
       />
     </>
+  );
+}
+
+function SortHeader({
+  label,
+  active,
+  dir,
+  onClick,
+  className,
+  align = "left",
+}: {
+  label: string;
+  active: boolean;
+  dir: "asc" | "desc";
+  onClick: () => void;
+  className?: string;
+  align?: "left" | "right";
+}) {
+  const Icon = !active ? ArrowUpDown : dir === "asc" ? ArrowUp : ArrowDown;
+  return (
+    <th
+      className={`px-4 py-2 text-${align} text-[11px] uppercase tracking-wider font-medium ${className ?? ""}`}
+    >
+      <button
+        type="button"
+        onClick={onClick}
+        className={`inline-flex items-center gap-1.5 transition-colors ${
+          active ? "text-ink-50" : "text-ink-500 hover:text-ink-300"
+        }`}
+        aria-sort={active ? (dir === "asc" ? "ascending" : "descending") : "none"}
+      >
+        {label}
+        <Icon className="h-3 w-3 opacity-70" />
+      </button>
+    </th>
   );
 }
 
