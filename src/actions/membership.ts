@@ -208,8 +208,11 @@ export async function acceptInvitationAction(token: string) {
     include: { tenant: true },
   });
   if (!invite) throw new Error("Invitation not found");
+  // Land in the portal that matches the invited role — the slug root
+  // /t/{slug} redirects appropriately via /t/[slug]/page.tsx.
+  const landingHref = `/t/${invite.tenant.slug}`;
   if (invite.acceptedAt) {
-    redirect(`/t/${invite.tenant.slug}/coach/dashboard`);
+    redirect(landingHref);
   }
   if (invite.expiresAt < new Date()) throw new Error("This invitation has expired");
   if (invite.email.toLowerCase() !== user.email?.toLowerCase()) {
@@ -228,5 +231,5 @@ export async function acceptInvitationAction(token: string) {
     }),
   ]);
 
-  redirect(`/t/${invite.tenant.slug}/coach/dashboard`);
+  redirect(landingHref);
 }

@@ -20,7 +20,8 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
   });
 
   if (!invite) return <Shell><Invalid message="This invitation link is invalid." /></Shell>;
-  if (invite.acceptedAt) redirect(`/t/${invite.tenant.slug}/coach/dashboard`);
+  // Slug root redirects to the role-correct portal via /t/[slug]/page.tsx.
+  if (invite.acceptedAt) redirect(`/t/${invite.tenant.slug}`);
   if (invite.expiresAt < new Date()) return <Shell><Invalid message="This invitation has expired. Ask the inviter to send a new one." /></Shell>;
 
   const session = await auth();
