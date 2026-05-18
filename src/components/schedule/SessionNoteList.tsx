@@ -79,7 +79,9 @@ export function SessionNoteList({
                 <div className="flex items-center gap-2 flex-wrap text-sm">
                   <span className="font-semibold text-ink-50">{authorName}</span>
                   <span className="text-ink-700">·</span>
-                  <span className="text-ink-500 text-xs">{formatDistanceToNow(n.createdAt, { addSuffix: true })}</span>
+                  <span className="text-ink-500 text-xs" suppressHydrationWarning>
+                    {formatDistanceToNow(n.createdAt, { addSuffix: true })}
+                  </span>
                   {n.player && (
                     <>
                       <span className="text-ink-700">·</span>

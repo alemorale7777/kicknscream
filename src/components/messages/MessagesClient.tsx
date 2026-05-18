@@ -223,7 +223,10 @@ export function MessagesClient({
                                   .join(", ")
                               : "Conversation"}
                           </p>
-                          <span className="text-[10px] text-ink-500 shrink-0">
+                          <span
+                            className="text-[10px] text-ink-500 shrink-0"
+                            suppressHydrationWarning
+                          >
                             {formatDistanceToNow(new Date(t.lastMessageAt), { addSuffix: false })}
                           </span>
                         </div>
@@ -462,7 +465,10 @@ function ConversationPane({
                 )}
               >
                 <p>{m.body}</p>
-                <p className="text-[10px] text-ink-500 mt-1 flex items-center gap-1.5">
+                <p
+                  className="text-[10px] text-ink-500 mt-1 flex items-center gap-1.5"
+                  suppressHydrationWarning
+                >
                   {m.channel === "EMAIL" ? (
                     <Mail className="h-2.5 w-2.5" />
                   ) : null}

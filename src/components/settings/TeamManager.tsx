@@ -210,7 +210,7 @@ export function TeamManager({
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-ink-50 truncate">{inv.email}</p>
-                    <p className="text-xs text-ink-500">
+                    <p className="text-xs text-ink-500" suppressHydrationWarning>
                       {expired
                         ? "Expired"
                         : `Expires ${formatDistanceToNow(inv.expiresAt, { addSuffix: true })}`}

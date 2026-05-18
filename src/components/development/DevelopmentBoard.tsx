@@ -124,7 +124,9 @@ export function DevelopmentBoard({
                     {lastNoteAt && (
                       <>
                         <span className="text-ink-700">·</span>
-                        <span>{formatDistanceToNow(lastNoteAt, { addSuffix: true })}</span>
+                        <span suppressHydrationWarning>
+                          {formatDistanceToNow(lastNoteAt, { addSuffix: true })}
+                        </span>
                       </>
                     )}
                   </div>
@@ -340,7 +342,9 @@ function NoteRow({
             <AvatarFallback className="text-[10px]">{getInitials(authorName)}</AvatarFallback>
           </Avatar>
           <span className="font-medium text-ink-50">{authorName}</span>
-          <span className="text-ink-500 text-xs">{formatDistanceToNow(note.createdAt, { addSuffix: true })}</span>
+          <span className="text-ink-500 text-xs" suppressHydrationWarning>
+            {formatDistanceToNow(note.createdAt, { addSuffix: true })}
+          </span>
           {note.category && <Badge variant="outline">{note.category}</Badge>}
           {note.rating !== null && note.rating !== undefined && (
             <span className="inline-flex items-center gap-0.5 text-flood-400">
