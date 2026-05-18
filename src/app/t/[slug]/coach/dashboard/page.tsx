@@ -372,19 +372,13 @@ function SetupCard({
   programCount: number;
 }) {
   const hasProgram = programCount > 0;
-  const stripeReady = !!tenant.stripeAccountId && !!tenant.stripeChargesEnabled;
-  if (hasProgram && stripeReady) return null;
+  // Only surface the big setup CTA for the "no services yet" state.
+  // Stripe-not-connected is now handled by the NeedsAttention queue
+  // above, so two-tier redundancy ("connect Stripe" → "Connect Stripe")
+  // is suppressed when a program exists.
+  if (hasProgram) return null;
 
-  // Re-frame the CTA around the specific step still missing — programs
-  // first, then Stripe.
-  const step = !hasProgram
-    ? next
-    : {
-        title: "Connect Stripe to take payments",
-        copy: "Your services are listed but checkout isn't live yet. Connect your Stripe account to start collecting bookings online.",
-        cta: "Connect Stripe",
-        href: (s: string) => `/t/${s}/coach/settings/billing`,
-      };
+  const step = next;
 
   return (
     <Card className="relative overflow-hidden">

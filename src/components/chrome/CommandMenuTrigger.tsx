@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { Command } from "cmdk";
 import {
   LayoutDashboard,
@@ -78,9 +78,15 @@ export function CommandMenuTrigger({
   tenantType: TenantType;
 }) {
   const router = useRouter();
+  const pathname = usePathname() ?? "";
   const [open, setOpen] = useState(false);
 
+  // Suppress on the family portal even for multi-role users — the palette
+  // is a coach tool, the parent surfaces have their own bottom-tab nav.
+  const onFamilyPortal = /^\/t\/[^/]+\/family(\/|$)/.test(pathname);
+
   useEffect(() => {
+    if (onFamilyPortal) return;
     function onKey(e: KeyboardEvent) {
       const isMac = navigator.platform.toUpperCase().includes("MAC");
       const meta = isMac ? e.metaKey : e.ctrlKey;
@@ -91,7 +97,9 @@ export function CommandMenuTrigger({
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [onFamilyPortal]);
+
+  if (onFamilyPortal) return null;
 
   function navigate(href: string) {
     setOpen(false);

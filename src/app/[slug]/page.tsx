@@ -64,6 +64,12 @@ export async function generateMetadata({
   return {
     title: tenant.name,
     description: `${tenant.name} on KickNScream — ${TYPE_COPY[tenant.type].tagline}`,
+    // Canonical points at /{slug}; the authenticated /t/{slug} variant
+    // is robots-blocked but Google can still discover it via internal
+    // links — the canonical tells them which version to index.
+    alternates: {
+      canonical: `/${slug}`,
+    },
     openGraph: {
       title: tenant.name,
       description: TYPE_COPY[tenant.type].tagline,

@@ -7,7 +7,8 @@ import { OutstandingStrip } from "@/components/family/OutstandingStrip";
 import { Card } from "@/components/ui/card";
 import { getEventWeather } from "@/lib/weather";
 import { loadUpcomingFamilyEvents } from "@/lib/family/events";
-import { ScrollText, ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ScrollText, ArrowRight, Users, Calendar } from "lucide-react";
 
 export const metadata = { title: "Home" };
 
@@ -85,6 +86,30 @@ export default async function FamilyHomePage({
         </p>
         <h1 className="text-3xl lg:text-4xl font-bold tracking-[-0.03em]">{tenant.name}</h1>
       </header>
+
+      {players.length === 0 ? (
+        <Card className="p-8 text-center border-dashed">
+          <div className="mx-auto h-12 w-12 rounded-full bg-turf-400/10 text-turf-300 flex items-center justify-center mb-3">
+            <Users className="h-6 w-6" />
+          </div>
+          <p className="font-semibold text-ink-50">No players linked yet</p>
+          <p className="text-sm text-ink-500 mt-1 max-w-md mx-auto">
+            Book a session with {tenant.name} and your kid shows up here.
+            Already booked? Ask your coach to link your email to the roster.
+          </p>
+          <div className="mt-5 flex justify-center gap-2">
+            <Button variant="primary" size="sm" asChild>
+              <Link href={`/t/${tenant.slug}/family/book`}>
+                <Calendar className="h-3.5 w-3.5" />
+                Book a session
+              </Link>
+            </Button>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href={`/${tenant.slug}`}>View public page</Link>
+            </Button>
+          </div>
+        </Card>
+      ) : null}
 
       <OutstandingStrip tenantSlug={tenant.slug} invoices={invoices} />
 
