@@ -8,13 +8,16 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**
- * Every 15 minutes — mark untouched attendance as NO_SHOW.
+ * Every 15 minutes — write Attendance(status=NO_SHOW) rows for events that
+ * ended 30+ minutes ago and never had attendance taken.
  *
- * Rule: events that ended 30+ minutes ago without any attendance row written
- * get their enrollments flipped to NO_SHOW, freeing the spot in reporting.
+ * Each (event × enrolled player) without an existing Attendance row gets
+ * one NO_SHOW row. We don't touch the parent Enrollment — that lives
+ * across multiple events of the program and would over-flip if mass-
+ * updated on a single missed event.
  *
- * Only enrollments still in ACTIVE / CONFIRMED / PAID states get flipped.
- * PENDING (unconfirmed), CANCELED, REFUNDED, NO_SHOW are left alone.
+ * Idempotent because Attendance has a unique (eventId, playerId) — second
+ * sweeps are no-ops via skipDuplicates.
  */
 export async function GET() {
   try {
@@ -25,34 +28,67 @@ export async function GET() {
 
   const cutoff = subMinutes(new Date(), 30);
 
-  // Find recently-ended events that have NO attendance rows
-  const candidateEvents = await db.event.findMany({
+  // Limit scan to a 7-day window so we don't endlessly retry ancient events
+  // if attendance was never taken for them.
+  const since = subMinutes(cutoff, 60 * 24 * 7);
+
+  const events = await db.event.findMany({
     where: {
-      endsAt: { lt: cutoff },
-      attendances: { none: {} },
+      endsAt: { lt: cutoff, gte: since },
+      programId: { not: null },
     },
-    select: { id: true, programId: true, tenantId: true, title: true, endsAt: true },
-    take: 200,
+    select: {
+      id: true,
+      programId: true,
+      attendances: { select: { playerId: true } },
+      program: {
+        select: {
+          enrollments: {
+            where: { status: { in: ["ACTIVE", "CONFIRMED", "PAID"] } },
+            select: { playerId: true },
+          },
+        },
+      },
+    },
+    take: 500,
   });
 
-  let flipped = 0;
-  for (const ev of candidateEvents) {
-    if (!ev.programId) continue;
-    const res = await db.enrollment.updateMany({
-      where: {
-        programId: ev.programId,
-        status: { in: ["ACTIVE", "CONFIRMED", "PAID"] },
-        // We don't perfectly know which enrollment matches which event — the
-        // safe rule is to only flip when the enrollment's createdAt predates
-        // the event's start. For Phase G v1 we don't enforce that match
-        // because the data shape doesn't link enrollment ↔ event.
-        attendedAt: null,
-      },
-      data: { status: "NO_SHOW" },
+  let rowsWritten = 0;
+  let eventsTouched = 0;
+  for (const ev of events) {
+    if (!ev.program) continue;
+    const alreadyMarked = new Set(ev.attendances.map((a) => a.playerId));
+    const missing = ev.program.enrollments
+      .map((e) => e.playerId)
+      .filter((pid) => !alreadyMarked.has(pid));
+    if (missing.length === 0) continue;
+
+    // AttendanceStatus has no NO_SHOW — the closest semantic is ABSENT,
+    // which is also how the UI renders "didn't show up". Coaches can
+    // override per-player back to PRESENT/LATE/EXCUSED later if they
+    // belatedly take attendance.
+    const result = await db.attendance.createMany({
+      data: missing.map((playerId) => ({
+        eventId: ev.id,
+        playerId,
+        status: "ABSENT" as const,
+      })),
+      skipDuplicates: true,
     });
-    flipped += res.count;
+    rowsWritten += result.count;
+    eventsTouched++;
   }
 
-  console.log("[cron:no-show-sweep]", { events: candidateEvents.length, flipped, at: new Date().toISOString() });
-  return NextResponse.json({ ok: true, eventsScanned: candidateEvents.length, enrollmentsFlipped: flipped });
+  console.log("[cron:no-show-sweep]", {
+    at: new Date().toISOString(),
+    eventsScanned: events.length,
+    eventsTouched,
+    rowsWritten,
+  });
+  return NextResponse.json({
+    ok: true,
+    eventsScanned: events.length,
+    eventsTouched,
+    rowsWritten,
+  });
 }
