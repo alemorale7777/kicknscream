@@ -40,6 +40,7 @@ export function navForTenantType(type: TenantType, slug = ":slug"): NavItem[] {
         { label: "Schedule", href: `${base}/schedule`, icon: Calendar },
         { label: "Players", href: `${base}/roster`, icon: Users },
         { label: "Messages", href: `${base}/messages`, icon: MessageSquare },
+        { label: "Reports", href: `${base}/reports`, icon: BarChart3 },
         { label: "Settings", href: `${base}/settings`, icon: Settings },
       ];
     case "INSTITUTION":

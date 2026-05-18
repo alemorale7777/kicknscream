@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { navForTenantType, NEXT_STEP_BY_TYPE } from "@/lib/nav";
 
 describe("navForTenantType", () => {
-  it("returns coach nav with 7 items in order", () => {
+  it("returns coach nav with 8 items in order", () => {
     const items = navForTenantType("COACH");
     expect(items.map((i) => i.label)).toEqual([
       "Dashboard",
@@ -11,6 +11,7 @@ describe("navForTenantType", () => {
       "Schedule",
       "Players",
       "Messages",
+      "Reports",
       "Settings",
     ]);
   });
