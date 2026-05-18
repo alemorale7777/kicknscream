@@ -89,19 +89,35 @@ export async function GET(
     });
   }
 
+  // Walk Player → Enrollment → Program → Event the same way the family
+  // home and family schedule do. The old title-match approach silently
+  // dropped every coach-created event from the parent's ICS feed.
   const players = await db.player.findMany({
-    where: { parentId: prefs.userId, tenantId: { in: tenantIds } },
-    select: {
-      id: true,
-      firstName: true,
-      lastName: true,
-      tenantId: true,
+    where: {
+      tenantId: { in: tenantIds },
+      OR: [
+        { parentId: prefs.userId },
+        { parentLinks: { some: { parentUserId: prefs.userId } } },
+      ],
     },
+    select: { id: true },
   });
   if (players.length === 0) {
     return new NextResponse(emptyCalendar(), { headers: ICS_HEADERS });
   }
-  const playerNames = players.map((p) => `${p.firstName} ${p.lastName}`);
+  const playerIds = players.map((p) => p.id);
+
+  const enrollments = await db.enrollment.findMany({
+    where: {
+      playerId: { in: playerIds },
+      status: { in: ["ACTIVE", "CONFIRMED", "PAID", "PENDING"] },
+    },
+    select: { programId: true },
+  });
+  const programIds = Array.from(new Set(enrollments.map((e) => e.programId)));
+  if (programIds.length === 0) {
+    return new NextResponse(emptyCalendar(), { headers: ICS_HEADERS });
+  }
 
   const windowStart = subDays(new Date(), 7);
   const windowEnd = addMonths(new Date(), 6);
@@ -109,8 +125,8 @@ export async function GET(
   const events = await db.event.findMany({
     where: {
       tenantId: { in: tenantIds },
+      programId: { in: programIds },
       startsAt: { gte: windowStart, lte: windowEnd },
-      title: { in: playerNames },
     },
     include: {
       location: true,
