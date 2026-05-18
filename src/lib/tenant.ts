@@ -35,7 +35,10 @@ export async function requireTenant(slug: string) {
   if (!tenant) notFound();
 
   const user = await getCurrentUser();
-  if (!user) redirect(`/auth/signin?callbackUrl=/t/${slug}/coach/dashboard`);
+  // Hardcoding /coach/dashboard here would 403 parents — point the
+  // callback at the slug root, which redirects to the role-correct
+  // portal via /t/[slug]/page.tsx.
+  if (!user) redirect(`/auth/signin?callbackUrl=/t/${slug}`);
 
   const membership = user.memberships.find((m) => m.tenantId === tenant.id);
   if (!membership) notFound();
