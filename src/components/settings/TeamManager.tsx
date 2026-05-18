@@ -18,7 +18,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { inviteMemberAction, removeMemberAction, revokeInvitationAction } from "@/actions/membership";
+import {
+  changeMemberRoleAction,
+  inviteMemberAction,
+  removeMemberAction,
+  revokeInvitationAction,
+} from "@/actions/membership";
 import { getInitials } from "@/lib/utils";
 import { Mail, UserPlus, Trash2, Clock, Loader2, X } from "lucide-react";
 import { roleLabel } from "@/lib/roles";
@@ -148,7 +153,15 @@ export function TeamManager({
                 </p>
                 <p className="text-xs text-ink-500 truncate">{m.user.email}</p>
               </div>
-              <Badge variant={ROLE_VARIANT[m.role]}>{roleLabel(m.role)}</Badge>
+              {canEdit && m.role !== "OWNER" && m.userId !== currentUserId ? (
+                <MemberRoleSelect
+                  tenantId={tenantId}
+                  userId={m.userId}
+                  role={m.role}
+                />
+              ) : (
+                <Badge variant={ROLE_VARIANT[m.role]}>{roleLabel(m.role)}</Badge>
+              )}
               {canEdit && m.role !== "OWNER" && m.userId !== currentUserId && (
                 <Button
                   variant="ghost"
@@ -230,5 +243,47 @@ export function TeamManager({
         </section>
       )}
     </div>
+  );
+}
+
+/**
+ * Inline role dropdown for an existing teammate. Updates land via
+ * changeMemberRoleAction with a toast on success/failure; the success
+ * path doesn't roll back since the server revalidates the page and we'll
+ * re-render with fresh data.
+ */
+function MemberRoleSelect({
+  tenantId,
+  userId,
+  role,
+}: {
+  tenantId: string;
+  userId: string;
+  role: Role;
+}) {
+  const [pending, startTransition] = useTransition();
+  function onChange(next: Role) {
+    if (next === role) return;
+    startTransition(async () => {
+      try {
+        await changeMemberRoleAction({ tenantId, userId, role: next });
+        toast.success(`Role set to ${roleLabel(next)}`);
+      } catch (e) {
+        toast.error((e as Error).message);
+      }
+    });
+  }
+  return (
+    <Select value={role} onValueChange={(v) => onChange(v as Role)} disabled={pending}>
+      <SelectTrigger className="w-32 h-8 text-xs">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="ADMIN">{roleLabel("ADMIN")}</SelectItem>
+        <SelectItem value="COACH">{roleLabel("COACH")}</SelectItem>
+        <SelectItem value="PARENT">{roleLabel("PARENT")}</SelectItem>
+        <SelectItem value="PLAYER">{roleLabel("PLAYER")}</SelectItem>
+      </SelectContent>
+    </Select>
   );
 }

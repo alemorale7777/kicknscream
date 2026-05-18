@@ -84,6 +84,99 @@ export async function revokeInvitationAction(tenantId: string, invitationId: str
   if (tenant) revalidatePath(`/t/${tenant.slug}/coach/settings/team`);
 }
 
+const changeRoleSchema = z.object({
+  tenantId: z.string(),
+  userId: z.string(),
+  role: z.enum(["OWNER", "ADMIN", "COACH", "PARENT", "PLAYER"]),
+});
+
+/**
+ * Promote / demote a teammate. OWNER is special-cased: only the current
+ * OWNER can transfer ownership, and doing so demotes the current OWNER to
+ * ADMIN in the same transaction so the tenant never has zero owners.
+ *
+ * Every change writes an audit log row.
+ */
+export async function changeMemberRoleAction(
+  input: z.infer<typeof changeRoleSchema>
+) {
+  const data = changeRoleSchema.parse(input);
+  const actor = await getCurrentUser();
+  if (!actor) throw new Error("Not authenticated");
+  const myMembership = actor.memberships.find((m) => m.tenantId === data.tenantId);
+  if (!myMembership || !canManageTenant(myMembership.role)) {
+    throw new Error("You don't have permission to change roles");
+  }
+  if (actor.id === data.userId) {
+    throw new Error("Use the team settings to transfer ownership, not your own role");
+  }
+
+  const target = await db.membership.findUnique({
+    where: { userId_tenantId: { userId: data.userId, tenantId: data.tenantId } },
+  });
+  if (!target) throw new Error("Member not found");
+  if (target.role === data.role) return; // no-op
+
+  // Only an existing OWNER can hand off OWNER. Demoting an OWNER outside an
+  // ownership transfer would leave the tenant ownerless.
+  if (data.role === "OWNER" && myMembership.role !== "OWNER") {
+    throw new Error("Only the current OWNER can transfer ownership");
+  }
+  if (target.role === "OWNER" && data.role !== "OWNER") {
+    throw new Error(
+      "Demote OWNER by transferring ownership to another member first"
+    );
+  }
+
+  const tenant = await db.tenant.findUnique({ where: { id: data.tenantId } });
+  if (!tenant) throw new Error("Tenant not found");
+
+  if (data.role === "OWNER") {
+    // Atomic ownership transfer.
+    await db.$transaction([
+      db.membership.update({
+        where: { userId_tenantId: { userId: data.userId, tenantId: data.tenantId } },
+        data: { role: "OWNER" },
+      }),
+      db.membership.update({
+        where: { userId_tenantId: { userId: actor.id, tenantId: data.tenantId } },
+        data: { role: "ADMIN" },
+      }),
+      db.auditLog.create({
+        data: {
+          tenantId: data.tenantId,
+          actorUserId: actor.id,
+          action: "team.role_change",
+          targetType: "Membership",
+          targetId: data.userId,
+          diff: { from: target.role, to: "OWNER", previousOwner: actor.id },
+        },
+      }),
+    ]);
+  } else {
+    await db.$transaction([
+      db.membership.update({
+        where: { userId_tenantId: { userId: data.userId, tenantId: data.tenantId } },
+        data: { role: data.role },
+      }),
+      db.auditLog.create({
+        data: {
+          tenantId: data.tenantId,
+          actorUserId: actor.id,
+          action: "team.role_change",
+          targetType: "Membership",
+          targetId: data.userId,
+          diff: { from: target.role, to: data.role },
+        },
+      }),
+    ]);
+  }
+
+  revalidatePath(`/t/${tenant.slug}/coach/settings/team`);
+  revalidatePath(`/t/${tenant.slug}/admin/team`);
+  revalidatePath(`/t/${tenant.slug}/admin/audit`);
+}
+
 export async function removeMemberAction(tenantId: string, userId: string) {
   const actor = await getCurrentUser();
   if (!actor) throw new Error("Not authenticated");
