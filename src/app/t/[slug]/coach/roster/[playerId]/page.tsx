@@ -61,6 +61,24 @@ export default async function PlayerProfilePage({
     ? await db.user.findUnique({ where: { id: player.parentId } })
     : null;
 
+  // Pull session notes tagged to this player so the Notes tab merges
+  // event-scoped notes (visible to parent + AI-assisted) with the
+  // coach-only DevelopmentNote stream.
+  const sessionNotes = await db.sessionNote.findMany({
+    where: { playerId: player.id },
+    include: { event: { select: { id: true, title: true, startsAt: true } } },
+    orderBy: { createdAt: "desc" },
+    take: 50,
+  });
+
+  // Signed waivers for this player — surface them in the Files tab without
+  // requiring a coach to upload anything manually.
+  const waiverSignatures = await db.waiverSignature.findMany({
+    where: { playerId: player.id },
+    include: { waiver: true },
+    orderBy: { signedAt: "desc" },
+  });
+
   const events = player.enrollments.length
     ? await db.event.findMany({
         where: {
@@ -326,63 +344,15 @@ export default async function PlayerProfilePage({
         )}
 
         {activeTab === "notes" && (
-          <div className="space-y-2">
-            {player.developmentNotes.length === 0 ? (
-              <Card className="p-10 text-center border-dashed">
-                <Sparkles className="h-8 w-8 text-ink-700 mx-auto mb-3" />
-                <p className="text-ink-300 font-medium">No development notes yet</p>
-                <p className="text-xs text-ink-500 mt-1">
-                  Coaches can add notes from the Development page.
-                </p>
-              </Card>
-            ) : (
-              player.developmentNotes.map((n) => (
-                <Card key={n.id} className="p-4">
-                  <div className="flex items-baseline justify-between gap-3 mb-2">
-                    <span className="text-xs uppercase tracking-wider text-ink-500">
-                      {n.category}
-                    </span>
-                    <span className="text-xs font-mono text-ink-500">
-                      {format(n.createdAt, "MMM d, yyyy")}
-                    </span>
-                  </div>
-                  <Markdown>{n.content}</Markdown>
-                  {n.rating !== null && n.rating !== undefined && (
-                    <p className="mt-2 text-xs text-flood-400 font-mono">★ {n.rating}/5</p>
-                  )}
-                </Card>
-              ))
-            )}
-          </div>
+          <NotesTab
+            tenantSlug={tenant.slug}
+            sessionNotes={sessionNotes}
+            developmentNotes={player.developmentNotes}
+          />
         )}
 
         {activeTab === "files" && (
-          <div className="space-y-2">
-            {player.files.length === 0 ? (
-              <Card className="p-10 text-center border-dashed">
-                <FolderOpen className="h-8 w-8 text-ink-700 mx-auto mb-3" />
-                <p className="text-ink-300 font-medium">No files yet</p>
-                <p className="text-xs text-ink-500 mt-1">
-                  Waivers, medical forms, and photos will appear here.
-                </p>
-              </Card>
-            ) : (
-              player.files.map((f) => (
-                <Card key={f.id} className="p-3 flex items-center gap-3">
-                  <FileText className="h-4 w-4 text-ink-500 shrink-0" />
-                  <span className="flex-1 truncate text-ink-50">{f.filename ?? f.url}</span>
-                  <Badge variant="outline" className="text-[10px]">
-                    {f.kind.toLowerCase()}
-                  </Badge>
-                  <Button size="sm" variant="ghost" asChild>
-                    <a href={f.url} target="_blank" rel="noreferrer">
-                      Open
-                    </a>
-                  </Button>
-                </Card>
-              ))
-            )}
-          </div>
+          <FilesTab files={player.files} waiverSignatures={waiverSignatures} />
         )}
       </div>
     </div>
@@ -418,6 +388,176 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
     <div className="grid grid-cols-[140px_1fr] gap-3 text-sm">
       <span className="text-[10px] uppercase tracking-wider text-ink-500 pt-0.5">{label}</span>
       <div className="text-ink-50">{value}</div>
+    </div>
+  );
+}
+
+type SessionNoteRow = {
+  id: string;
+  content: string;
+  visibleToParent: boolean;
+  createdAt: Date;
+  event: { id: string; title: string; startsAt: Date } | null;
+};
+
+type DevelopmentNoteRow = {
+  id: string;
+  category: string | null;
+  content: string;
+  rating: number | null;
+  createdAt: Date;
+};
+
+function NotesTab({
+  tenantSlug,
+  sessionNotes,
+  developmentNotes,
+}: {
+  tenantSlug: string;
+  sessionNotes: SessionNoteRow[];
+  developmentNotes: DevelopmentNoteRow[];
+}) {
+  if (sessionNotes.length === 0 && developmentNotes.length === 0) {
+    return (
+      <Card className="p-10 text-center border-dashed">
+        <Sparkles className="h-8 w-8 text-ink-700 mx-auto mb-3" />
+        <p className="text-ink-300 font-medium">No notes yet</p>
+        <p className="text-xs text-ink-500 mt-1">
+          Session notes appear here as coaches write them on the event page.
+          Development notes from the Development board show up too.
+        </p>
+      </Card>
+    );
+  }
+
+  // Build a unified, descending-by-date timeline.
+  type Item =
+    | { kind: "session"; at: Date; data: SessionNoteRow }
+    | { kind: "dev"; at: Date; data: DevelopmentNoteRow };
+  const items: Item[] = [
+    ...sessionNotes.map(
+      (n): Item => ({ kind: "session", at: n.createdAt, data: n })
+    ),
+    ...developmentNotes.map(
+      (n): Item => ({ kind: "dev", at: n.createdAt, data: n })
+    ),
+  ].sort((a, b) => b.at.getTime() - a.at.getTime());
+
+  return (
+    <div className="space-y-2">
+      {items.map((it) =>
+        it.kind === "session" ? (
+          <Card key={`s-${it.data.id}`} className="p-4">
+            <div className="flex items-baseline justify-between gap-3 mb-2">
+              <span className="inline-flex items-center gap-2 text-xs uppercase tracking-wider text-ink-500">
+                <Sparkles className="h-3 w-3 text-flood-400" />
+                Session note
+                {it.data.event && (
+                  <Link
+                    href={`/t/${tenantSlug}/coach/schedule/${it.data.event.id}`}
+                    className="text-ink-300 hover:text-ink-50 normal-case tracking-normal"
+                  >
+                    · {it.data.event.title}
+                  </Link>
+                )}
+              </span>
+              <span className="text-xs font-mono text-ink-500">
+                {format(it.data.createdAt, "MMM d, yyyy")}
+              </span>
+            </div>
+            <Markdown>{it.data.content}</Markdown>
+            {!it.data.visibleToParent && (
+              <p className="mt-2 text-[10px] uppercase tracking-wider text-warn">
+                Coach-only · not shared with parent
+              </p>
+            )}
+          </Card>
+        ) : (
+          <Card key={`d-${it.data.id}`} className="p-4">
+            <div className="flex items-baseline justify-between gap-3 mb-2">
+              <span className="text-xs uppercase tracking-wider text-ink-500">
+                {it.data.category ?? "Development"}
+              </span>
+              <span className="text-xs font-mono text-ink-500">
+                {format(it.data.createdAt, "MMM d, yyyy")}
+              </span>
+            </div>
+            <Markdown>{it.data.content}</Markdown>
+            {it.data.rating !== null && it.data.rating !== undefined && (
+              <p className="mt-2 text-xs text-flood-400 font-mono">
+                ★ {it.data.rating}/5
+              </p>
+            )}
+          </Card>
+        )
+      )}
+    </div>
+  );
+}
+
+type WaiverSigRow = {
+  id: string;
+  signerName: string;
+  signedAt: Date;
+  waiver: { title: string };
+};
+
+type FileRow = {
+  id: string;
+  kind: string;
+  url: string;
+  filename: string | null;
+};
+
+function FilesTab({
+  files,
+  waiverSignatures,
+}: {
+  files: FileRow[];
+  waiverSignatures: WaiverSigRow[];
+}) {
+  if (files.length === 0 && waiverSignatures.length === 0) {
+    return (
+      <Card className="p-10 text-center border-dashed">
+        <FolderOpen className="h-8 w-8 text-ink-700 mx-auto mb-3" />
+        <p className="text-ink-300 font-medium">No files yet</p>
+        <p className="text-xs text-ink-500 mt-1">
+          Signed waivers, medical forms, and photos will appear here.
+        </p>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {waiverSignatures.map((s) => (
+        <Card key={`w-${s.id}`} className="p-3 flex items-center gap-3">
+          <FileText className="h-4 w-4 text-turf-300 shrink-0" />
+          <span className="flex-1 truncate text-ink-50">
+            {s.waiver.title}
+          </span>
+          <span className="text-xs text-ink-500">
+            Signed by {s.signerName} · {format(s.signedAt, "MMM d, yyyy")}
+          </span>
+          <Badge variant="outline" className="text-[10px] border-turf-400/30 text-turf-300">
+            Waiver
+          </Badge>
+        </Card>
+      ))}
+      {files.map((f) => (
+        <Card key={`f-${f.id}`} className="p-3 flex items-center gap-3">
+          <FileText className="h-4 w-4 text-ink-500 shrink-0" />
+          <span className="flex-1 truncate text-ink-50">{f.filename ?? f.url}</span>
+          <Badge variant="outline" className="text-[10px]">
+            {f.kind.toLowerCase()}
+          </Badge>
+          <Button size="sm" variant="ghost" asChild>
+            <a href={f.url} target="_blank" rel="noreferrer">
+              Open
+            </a>
+          </Button>
+        </Card>
+      ))}
     </div>
   );
 }
