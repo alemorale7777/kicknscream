@@ -5,6 +5,7 @@ import { UserMenu } from "./UserMenu";
 import { CommandMenuTrigger } from "./CommandMenuTrigger";
 import { getCurrentUser } from "@/lib/tenant";
 import { Separator } from "@/components/ui/separator";
+import { hasRole } from "@/lib/roles";
 import type { Tenant, User, Role } from "@prisma/client";
 
 export async function TopNav({
@@ -26,12 +27,20 @@ export async function TopNav({
       role: m.role,
     })) ?? [];
 
+  // Logo lands at the portal root that matches the user's role —
+  // operators (COACH or higher) go to the coach dashboard, parents
+  // go to the family home. A bare COACH-dashboard link drops parents
+  // straight into a 403 redirect.
+  const homeHref = hasRole(currentRole, "COACH")
+    ? `/t/${tenant.slug}/coach/dashboard`
+    : `/t/${tenant.slug}/family/home`;
+
   return (
     <header className="sticky top-0 z-40 h-16 border-b border-line bg-pitch-900/85 backdrop-blur-md">
       <div className="h-full px-4 lg:px-6 flex items-center justify-between gap-4">
         <div className="flex items-center gap-4 min-w-0">
           <Link
-            href={`/t/${tenant.slug}/coach/dashboard`}
+            href={homeHref}
             className="shrink-0 transition-opacity hover:opacity-80"
             aria-label="KickNScream home"
           >
@@ -51,7 +60,9 @@ export async function TopNav({
         </div>
 
         <div className="flex items-center gap-2">
-          <CommandMenuTrigger tenantSlug={tenant.slug} tenantType={tenant.type} />
+          {hasRole(currentRole, "COACH") && (
+            <CommandMenuTrigger tenantSlug={tenant.slug} tenantType={tenant.type} />
+          )}
           <UserMenu user={user} />
         </div>
       </div>
