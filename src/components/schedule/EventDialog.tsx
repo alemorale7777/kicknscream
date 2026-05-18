@@ -212,9 +212,29 @@ export function EventDialog({
                   }
                 : undefined,
           });
-          toast.success(
-            result.count > 1 ? `Created ${result.count} events` : "Event created"
-          );
+          if (result.count > 1 && result.firstEventId) {
+            // Recurrence mistakes are common — give the coach a 6-second Undo
+            // window that scope-deletes the whole series in one shot.
+            const firstEventId = result.firstEventId;
+            const total = result.count;
+            toast.success(`Created ${total} events`, {
+              duration: 6000,
+              action: {
+                label: "Undo",
+                onClick: () => {
+                  deleteEventAction({
+                    tenantId,
+                    eventId: firstEventId,
+                    scope: "all",
+                  })
+                    .then(() => toast.success(`Undone — ${total} events removed`))
+                    .catch((err) => toast.error((err as Error).message));
+                },
+              },
+            });
+          } else {
+            toast.success("Event created");
+          }
           reset();
         }
         setPendingSave(null);
@@ -275,7 +295,10 @@ export function EventDialog({
                     {ALL_EVENT_TYPES.map((t) => (
                       <SelectItem key={t} value={t}>
                         <span className="inline-flex items-center gap-2">
-                          <span className={`h-2 w-2 rounded-full ${EVENT_TONE[t].dot}`} />
+                          <span
+                            className="h-2 w-2 rounded-full"
+                            style={{ backgroundColor: EVENT_TONE[t].accent }}
+                          />
                           {EVENT_TONE[t].label}
                         </span>
                       </SelectItem>

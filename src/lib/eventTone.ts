@@ -2,8 +2,17 @@ import type { EventType } from "@prisma/client";
 
 /**
  * Visual tone per event type — used by calendar blocks, badges, and legends.
- * Stays inside the Pitch & Floodlight palette; each type gets a distinct hue
- * for at-a-glance recognition on the week grid.
+ * Each type carries:
+ *  - Tailwind class strings (`bg`, `border`, `text`, `dot`) for cases inside
+ *    the Pitch & Floodlight palette (LESSON/CLASS/GAME/CAMP). These are the
+ *    "safe" types — every class string here resolves to a defined token.
+ *  - `accent` hex — the authoritative color, used for inline-styled chips so
+ *    PRACTICE/TRYOUT/CLINIC don't depend on Tailwind v4 picking up arbitrary
+ *    palette classes from string templates in TS files (which it didn't in
+ *    production builds — chips were rendering near-transparent).
+ *
+ * Renderers that show many event types on one surface (WeekView, MonthView)
+ * should prefer `accent` + an `alpha` helper over the class strings.
  */
 export const EVENT_TONE: Record<
   EventType,
@@ -75,3 +84,22 @@ export const EVENT_TONE: Record<
 };
 
 export const ALL_EVENT_TYPES = Object.keys(EVENT_TONE) as EventType[];
+
+/**
+ * Build a chip style object from an event tone. Uses the authoritative `accent`
+ * hex so it's robust to Tailwind palette purging (PRACTICE/TRYOUT/CLINIC use
+ * default-palette colors that don't always survive the v4 content scan when
+ * declared as TS string templates).
+ */
+export function toneChipStyle(
+  accent: string,
+  opts: { fillAlpha?: number; borderAlpha?: number } = {}
+) {
+  const fill = opts.fillAlpha ?? 0.12;
+  const border = opts.borderAlpha ?? 0.45;
+  return {
+    backgroundColor: `color-mix(in srgb, ${accent} ${Math.round(fill * 100)}%, transparent)`,
+    borderColor: `color-mix(in srgb, ${accent} ${Math.round(border * 100)}%, transparent)`,
+    color: accent,
+  } as const;
+}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { EVENT_TONE } from "@/lib/eventTone";
+import { EVENT_TONE, toneChipStyle } from "@/lib/eventTone";
 import { cn } from "@/lib/utils";
 import {
   addDays,
@@ -122,13 +122,14 @@ export function MonthView({
                       }}
                       className={cn(
                         "flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] leading-tight",
-                        "border cursor-pointer hover:translate-x-0.5 transition-transform",
-                        tone.bg,
-                        tone.border,
-                        tone.text
+                        "border cursor-pointer hover:translate-x-0.5 transition-transform"
                       )}
+                      style={toneChipStyle(tone.accent, { fillAlpha: 0.14, borderAlpha: 0.45 })}
                     >
-                      <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", tone.dot)} />
+                      <span
+                        className="h-1.5 w-1.5 rounded-full shrink-0"
+                        style={{ backgroundColor: tone.accent }}
+                      />
                       <span className="font-mono text-[9px] opacity-80 shrink-0">{format(e.startsAt, "HHmm")}</span>
                       <span className="truncate font-medium">{e.title}</span>
                     </div>

@@ -105,18 +105,27 @@ async function syncStripeRecurringPrice(opts: {
 const PRICE_MODEL = z.enum(["PER_SESSION", "PACKAGE", "MONTHLY", "SEASON", "FREE"]);
 const SKILL_LEVEL = z.enum(["BEGINNER", "INTERMEDIATE", "ADVANCED", "ELITE"]);
 
-const baseSchema = z.object({
-  tenantId: z.string(),
-  name: z.string().min(2).max(120),
-  description: z.string().max(2000).optional(),
-  ageMin: z.union([z.number().int().min(2).max(99), z.literal("")]).optional().nullable(),
-  ageMax: z.union([z.number().int().min(2).max(99), z.literal("")]).optional().nullable(),
-  skillLevel: SKILL_LEVEL.optional().nullable(),
-  priceModel: PRICE_MODEL,
-  // Dollars on the wire; we store cents
-  priceDollars: z.number().min(0).max(99999),
-  capacity: z.union([z.number().int().min(1).max(2000), z.literal("")]).optional().nullable(),
-});
+const baseSchema = z
+  .object({
+    tenantId: z.string(),
+    name: z.string().min(2).max(120),
+    description: z.string().max(2000).optional(),
+    ageMin: z.union([z.number().int().min(2).max(99), z.literal("")]).optional().nullable(),
+    ageMax: z.union([z.number().int().min(2).max(99), z.literal("")]).optional().nullable(),
+    skillLevel: SKILL_LEVEL.optional().nullable(),
+    priceModel: PRICE_MODEL,
+    // Dollars on the wire; we store cents
+    priceDollars: z.number().min(0).max(99999),
+    capacity: z.union([z.number().int().min(1).max(2000), z.literal("")]).optional().nullable(),
+  })
+  .refine(
+    (d) => !(d.priceModel === "MONTHLY" && d.priceDollars <= 0),
+    {
+      message:
+        "Monthly programs need a price. Use Free if there's no charge, or set a non-zero amount.",
+      path: ["priceDollars"],
+    }
+  );
 
 async function assertCanManage(tenantId: string) {
   const user = await getCurrentUser();

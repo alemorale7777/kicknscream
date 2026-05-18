@@ -18,6 +18,10 @@ import {
   Users as UsersIcon,
   Wallet,
   FileText,
+  Send,
+  UserPlus,
+  CreditCard,
+  type LucideIcon,
 } from "lucide-react";
 import { startOfDay, endOfDay, addDays, subDays, eachDayOfInterval, isSameDay } from "date-fns";
 import { formatCents } from "@/lib/utils";
@@ -65,7 +69,6 @@ async function renderOperatorDashboard(
   const dayEnd = endOfDay(now);
   const weekEnd = addDays(now, 7);
 
-  const sevenDaysAgo = subDays(now, 7);
   const fourteenDaysAgo = subDays(now, 14);
 
   const [
@@ -124,7 +127,13 @@ async function renderOperatorDashboard(
     }),
   ]);
 
-  const firstName = user.name?.split(" ")[0] ?? "Coach";
+  // Avoid yelling the user's email handle. If we don't have a proper name
+  // (no space, or all-digit suffix like the email localpart), fall back to
+  // "Coach" — a cleaner greeting than "Hello, alemorale7777".
+  const rawName = user.name?.trim();
+  const looksLikeHandle =
+    !!rawName && /^[a-z0-9_.+-]+$/.test(rawName) && /[0-9]/.test(rawName);
+  const firstName = rawName && !looksLikeHandle ? rawName.split(" ")[0] : "Coach";
   const outstandingCents = openInvoicesAgg._sum.amount ?? 0;
   const outstandingCount = openInvoicesAgg._count;
 
@@ -200,7 +209,7 @@ async function renderOperatorDashboard(
     <div className="max-w-6xl space-y-8">
       <header className="space-y-2">
         <div className="flex items-center gap-3">
-          <p className="text-sm uppercase tracking-[0.2em] text-ink-500">Hello, {firstName}</p>
+          <p className="text-sm text-ink-500">Hello, {firstName}</p>
           <Badge variant="outline">{role.toLowerCase()}</Badge>
         </div>
         <div className="flex items-baseline gap-3">
@@ -288,21 +297,25 @@ async function renderOperatorDashboard(
         <div className="grid gap-3 sm:grid-cols-2">
           <QuickLink
             href={`/t/${tenant.slug}/coach/programs`}
+            icon={GraduationCap}
             title={tenant.type === "COACH" ? "Manage services" : "Manage programs"}
             desc={tenant.type === "COACH" ? "Pricing, packages, descriptions" : "Sessions, classes, camps"}
           />
           <QuickLink
             href={`/t/${tenant.slug}/coach/settings/team`}
+            icon={UserPlus}
             title="Invite teammates"
             desc="Add admins, coaches, parents"
           />
           <QuickLink
             href={`/t/${tenant.slug}/coach/comms`}
+            icon={Send}
             title="Send a broadcast"
             desc="Email all parents at once"
           />
           <QuickLink
             href={`/t/${tenant.slug}/coach/settings/billing`}
+            icon={CreditCard}
             title="Billing"
             desc="Connect Stripe to accept payments"
           />
@@ -436,17 +449,30 @@ function StatCard({
   return <Card>{inner}</Card>;
 }
 
-function QuickLink({ href, title, desc }: { href: string; title: string; desc: string }) {
+function QuickLink({
+  href,
+  icon: Icon,
+  title,
+  desc,
+}: {
+  href: string;
+  icon: LucideIcon;
+  title: string;
+  desc: string;
+}) {
   return (
     <Link
       href={href}
-      className="group flex items-center justify-between gap-3 rounded-md border border-line bg-pitch-800 p-4 transition-all duration-[120ms] hover:border-turf-400/60 hover:bg-pitch-700"
+      className="group flex items-center gap-3 rounded-md border border-line bg-pitch-800 p-4 transition-all duration-[120ms] hover:border-turf-400/60 hover:bg-pitch-700"
     >
-      <div>
-        <p className="font-medium text-ink-50">{title}</p>
-        <p className="text-xs text-ink-500">{desc}</p>
+      <div className="h-9 w-9 rounded-md bg-pitch-700 text-ink-300 flex items-center justify-center shrink-0 group-hover:bg-turf-400/10 group-hover:text-turf-300 transition-colors duration-[120ms]">
+        <Icon className="h-4 w-4" />
       </div>
-      <ArrowRight className="h-4 w-4 text-ink-500 group-hover:text-turf-300 group-hover:translate-x-0.5 transition-all duration-[120ms]" />
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-ink-50 truncate">{title}</p>
+        <p className="text-xs text-ink-500 truncate">{desc}</p>
+      </div>
+      <ArrowRight className="h-4 w-4 text-ink-500 group-hover:text-turf-300 group-hover:translate-x-0.5 transition-all duration-[120ms] shrink-0" />
     </Link>
   );
 }

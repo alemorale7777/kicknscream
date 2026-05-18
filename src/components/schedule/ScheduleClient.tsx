@@ -8,7 +8,7 @@ import { WeekView } from "./WeekView";
 import { MonthView } from "./MonthView";
 import { DayView } from "./DayView";
 import { EventDialog } from "./EventDialog";
-import { EVENT_TONE, ALL_EVENT_TYPES } from "@/lib/eventTone";
+import { EVENT_TONE, ALL_EVENT_TYPES, toneChipStyle } from "@/lib/eventTone";
 import { cn } from "@/lib/utils";
 import {
   addDays,
@@ -160,7 +160,9 @@ export function ScheduleClient({
           </div>
         </div>
 
-        {/* Legend / filter chips */}
+        {/* Legend / filter chips — active state uses the type's accent color
+            via inline style (Tailwind v4 doesn't ship arbitrary palette
+            classes when they only appear in TS string templates). */}
         <div className="flex flex-wrap gap-2">
           {ALL_EVENT_TYPES.map((t) => {
             const tone = EVENT_TONE[t];
@@ -172,12 +174,22 @@ export function ScheduleClient({
                 className={cn(
                   "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium uppercase tracking-wider transition-all duration-[120ms]",
                   active
-                    ? `${tone.bg} ${tone.border} ${tone.text}`
-                    : "border-line bg-pitch-800 text-ink-700 hover:text-ink-500"
+                    ? "ring-1"
+                    : "border-line bg-pitch-800 text-ink-700 hover:text-ink-500 opacity-60 hover:opacity-100"
                 )}
+                style={
+                  active
+                    ? {
+                        ...toneChipStyle(tone.accent, { fillAlpha: 0.14, borderAlpha: 0.5 }),
+                      }
+                    : undefined
+                }
                 aria-pressed={active}
               >
-                <span className={cn("h-1.5 w-1.5 rounded-full", active ? tone.dot : "bg-ink-700")} />
+                <span
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ backgroundColor: active ? tone.accent : "currentColor" }}
+                />
                 {tone.label}
               </button>
             );

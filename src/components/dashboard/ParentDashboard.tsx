@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Markdown } from "@/components/schedule/Markdown";
-import { EVENT_TONE } from "@/lib/eventTone";
+import { EVENT_TONE, toneChipStyle } from "@/lib/eventTone";
 import { formatCents } from "@/lib/utils";
 import { format, formatDistanceToNow, differenceInYears, isPast } from "date-fns";
 import {
@@ -154,9 +154,10 @@ export function ParentDashboard({
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold text-ink-50 truncate">{e.title}</p>
                       <span
-                        className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] uppercase tracking-wider ${tone.bg} ${tone.border} ${tone.text}`}
+                        className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] uppercase tracking-wider"
+                        style={toneChipStyle(tone.accent, { fillAlpha: 0.14, borderAlpha: 0.45 })}
                       >
-                        <span className={`h-1 w-1 rounded-full ${tone.dot}`} />
+                        <span className="h-1 w-1 rounded-full" style={{ backgroundColor: tone.accent }} />
                         {tone.label}
                       </span>
                     </div>

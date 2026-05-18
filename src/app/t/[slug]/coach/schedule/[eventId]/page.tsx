@@ -114,11 +114,23 @@ export default async function EventDetailPage({
       {/* Hero card */}
       <Card className="overflow-hidden">
         <div
-          className={`px-6 py-5 border-b border-line ${tone.bg}`}
+          className="px-6 py-5 border-b border-line"
+          style={{
+            backgroundColor: `color-mix(in srgb, ${tone.accent} 12%, transparent)`,
+          }}
         >
           <div className="flex items-center gap-2 mb-2">
-            <Badge variant="outline" className={`${tone.border} ${tone.text}`}>
-              <span className={`h-1.5 w-1.5 rounded-full ${tone.dot} mr-1.5`} />
+            <Badge
+              variant="outline"
+              style={{
+                borderColor: `color-mix(in srgb, ${tone.accent} 50%, transparent)`,
+                color: tone.accent,
+              }}
+            >
+              <span
+                className="h-1.5 w-1.5 rounded-full mr-1.5"
+                style={{ backgroundColor: tone.accent }}
+              />
               {tone.label}
             </Badge>
             {event.program && <Badge variant="outline">{event.program.name}</Badge>}

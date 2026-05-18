@@ -77,9 +77,11 @@ export function Sparkline({
  * Neutral (0%) renders gray.
  */
 export function DeltaChip({ pct }: { pct: number | null }) {
-  if (pct === null || !Number.isFinite(pct)) {
+  // Null (no prior data) or exactly zero (no movement) both read as "—":
+  // a green "0%" against a zero KPI implies false confidence.
+  if (pct === null || !Number.isFinite(pct) || pct === 0) {
     return (
-      <span className="text-[10px] uppercase tracking-wider font-mono text-ink-700">
+      <span className="inline-flex items-center rounded-full border border-line bg-pitch-700 px-1.5 py-0 text-[10px] font-mono font-medium text-ink-500">
         —
       </span>
     );
@@ -88,9 +90,7 @@ export function DeltaChip({ pct }: { pct: number | null }) {
   const tone =
     pct > 0
       ? "text-turf-300 bg-turf-400/10 border-turf-400/30"
-      : pct < 0
-        ? "text-danger bg-danger/10 border-danger/30"
-        : "text-ink-500 bg-pitch-700 border-line";
+      : "text-danger bg-danger/10 border-danger/30";
   return (
     <span
       className={`inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-mono font-medium ${tone}`}

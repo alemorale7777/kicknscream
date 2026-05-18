@@ -77,8 +77,22 @@ export async function createEventAction(input: z.infer<typeof baseEventSchema>) 
     })),
   });
 
+  // Surface a representative event id so callers can offer an Undo affordance
+  // ("Created 8 events" → tap Undo → deleteEventAction with scope=all).
+  const firstEvent = seriesId
+    ? await db.event.findFirst({
+        where: { tenantId: data.tenantId, recurringSeriesId: seriesId },
+        orderBy: { startsAt: "asc" },
+        select: { id: true },
+      })
+    : null;
+
   revalidatePath(`/t/${membership.tenant.slug}/coach/schedule`);
-  return { count: occurrences.length };
+  return {
+    count: occurrences.length,
+    seriesId,
+    firstEventId: firstEvent?.id ?? null,
+  };
 }
 
 export type SeriesScope = "this" | "future" | "all";

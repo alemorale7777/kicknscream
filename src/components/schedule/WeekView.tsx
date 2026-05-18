@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useOptimistic, useRef, useState, useTransition } from "react";
-import { EVENT_TONE } from "@/lib/eventTone";
+import { EVENT_TONE, toneChipStyle } from "@/lib/eventTone";
 import { cn } from "@/lib/utils";
 import {
   addDays,
@@ -84,10 +84,11 @@ export function WeekView({
   const gridRef = useRef<HTMLDivElement>(null);
   const [hoverCell, setHoverCell] = useState<{ dayIdx: number; hour: number } | null>(null);
 
-  // DnD: drag tolerance keeps clicks from being mistaken for drags
+  // DnD: a 3px distance threshold separates clicks from drags without making
+  // touch drags feel sticky (4px was unreliable on trackpads with high DPI).
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: { distance: 4 },
+      activationConstraint: { distance: 3 },
     })
   );
 
@@ -133,6 +134,11 @@ export function WeekView({
           startsAt: newStart.toISOString(),
           endsAt: newEnd.toISOString(),
         });
+        const dayLabel =
+          dayShift === 0
+            ? format(newStart, "h:mm a")
+            : `${format(newStart, "EEE")} ${format(newStart, "h:mm a")}`;
+        toast.success(`Moved to ${dayLabel}`);
       } catch (err) {
         toast.error((err as Error).message);
       }
@@ -201,10 +207,10 @@ export function WeekView({
           {HOURS.map((h) => (
             <div
               key={h}
-              className="border-b border-line/60 text-[10px] uppercase tracking-wider text-ink-500 font-mono pr-2 pt-1 text-right"
+              className="border-b border-line/60 text-[11px] text-ink-500 font-mono pr-2 pt-1 text-right tabular-nums"
               style={{ height: HOUR_HEIGHT }}
             >
-              {format(new Date(2000, 0, 1, h, 0), "h a")}
+              {format(new Date(2000, 0, 1, h, 0), "h aaa")}
             </div>
           ))}
         </div>
@@ -335,9 +341,6 @@ function EventBlock({
       className={cn(
         "absolute inset-x-0.5 rounded-md px-2 py-1 text-left",
         "border backdrop-blur-sm select-none",
-        tone.bg,
-        tone.border,
-        tone.text,
         "transition-shadow duration-[120ms] hover:z-10 hover:shadow-lg hover:shadow-pitch-950/40",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flood-400 focus-visible:z-10",
         canEdit && "cursor-grab active:cursor-grabbing",
@@ -348,6 +351,7 @@ function EventBlock({
         height,
         transform: dragTransform,
         touchAction: canEdit ? "none" : undefined,
+        ...toneChipStyle(tone.accent, { fillAlpha: 0.18, borderAlpha: 0.5 }),
       }}
       {...listeners}
       {...attributes}

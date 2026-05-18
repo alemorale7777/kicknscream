@@ -95,14 +95,25 @@ export function RosterList({
   if (players.length === 0) {
     return (
       <>
-        <EmptyRoster canEdit={canEdit} onAdd={openCreate} />
+        <EmptyRoster
+          canEdit={canEdit}
+          onAdd={openCreate}
+          onImport={() => setImportOpen(true)}
+        />
         <PlayerDialog
+          key={editingPlayer?.id ?? "new"}
           tenantId={tenantId}
           player={editingPlayer}
           parentEmail={editingPlayer?.parent?.email ?? ""}
           open={dialogOpen}
           onOpenChange={setDialogOpen}
           showClubFields={showClubFields}
+        />
+        <RosterImportSheet
+          key={importOpen ? "import-open" : "import-closed"}
+          tenantId={tenantId}
+          open={importOpen}
+          onOpenChange={setImportOpen}
         />
       </>
     );
@@ -227,6 +238,7 @@ export function RosterList({
       </div>
 
       <PlayerDialog
+        key={editingPlayer?.id ?? "new"}
         tenantId={tenantId}
         player={editingPlayer}
         parentEmail={editingPlayer?.parent?.email ?? ""}
@@ -248,7 +260,15 @@ export function RosterList({
   );
 }
 
-function EmptyRoster({ canEdit, onAdd }: { canEdit: boolean; onAdd: () => void }) {
+function EmptyRoster({
+  canEdit,
+  onAdd,
+  onImport,
+}: {
+  canEdit: boolean;
+  onAdd: () => void;
+  onImport: () => void;
+}) {
   return (
     <Card className="p-12 text-center">
       <div className="mx-auto h-16 w-16 rounded-full bg-turf-400/10 text-turf-300 flex items-center justify-center mb-4">
@@ -259,10 +279,20 @@ function EmptyRoster({ canEdit, onAdd }: { canEdit: boolean; onAdd: () => void }
         Roster your first player and we&apos;ll auto-link their parent for messaging and attendance.
       </p>
       {canEdit && (
-        <Button variant="primary" onClick={onAdd}>
-          <Plus className="h-4 w-4" />
-          Add your first player
-        </Button>
+        <div className="flex flex-col items-center gap-2">
+          <Button variant="primary" onClick={onAdd}>
+            <Plus className="h-4 w-4" />
+            Add your first player
+          </Button>
+          <button
+            type="button"
+            onClick={onImport}
+            className="text-sm text-ink-500 hover:text-ink-50 transition-colors inline-flex items-center gap-1.5"
+          >
+            <Upload className="h-3.5 w-3.5" />
+            …or import from a CSV
+          </button>
+        </div>
       )}
     </Card>
   );

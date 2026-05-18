@@ -117,6 +117,7 @@ export function ProgramsList({
           )}
         </Card>
         <ProgramDialog
+          key={editing?.id ?? "new"}
           tenantId={tenantId}
           program={editing}
           open={dialogOpen}
@@ -181,6 +182,7 @@ export function ProgramsList({
       )}
 
       <ProgramDialog
+        key={editing?.id ?? "new"}
         tenantId={tenantId}
         program={editing}
         open={dialogOpen}

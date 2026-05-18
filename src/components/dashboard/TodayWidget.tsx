@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { EVENT_TONE } from "@/lib/eventTone";
+import { EVENT_TONE, toneChipStyle } from "@/lib/eventTone";
 import { format, isPast } from "date-fns";
 import { Calendar, Clock, MapPin, ArrowRight, CheckCircle2 } from "lucide-react";
 import type { Event, Location } from "@prisma/client";
@@ -105,9 +105,10 @@ function EventRow({
             {event.title}
           </p>
           <span
-            className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] uppercase tracking-wider ${tone.bg} ${tone.border} ${tone.text}`}
+            className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] uppercase tracking-wider"
+            style={toneChipStyle(tone.accent, { fillAlpha: 0.14, borderAlpha: 0.45 })}
           >
-            <span className={`h-1 w-1 rounded-full ${tone.dot}`} />
+            <span className="h-1 w-1 rounded-full" style={{ backgroundColor: tone.accent }} />
             {tone.label}
           </span>
           {done && (
