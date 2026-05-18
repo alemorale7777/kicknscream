@@ -181,6 +181,7 @@ export function ScheduleClient({
         {/* View */}
         {view === "week" && (
           <WeekView
+            tenantId={tenantId}
             anchorDate={anchorDate}
             events={filteredEvents}
             locations={locations}
