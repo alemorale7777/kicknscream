@@ -106,3 +106,37 @@ export async function deleteEventAction(tenantId: string, eventId: string) {
   await db.event.delete({ where: { id: eventId } });
   revalidatePath(`/t/${membership.tenant.slug}/coach/schedule`);
 }
+
+const moveEventSchema = z.object({
+  tenantId: z.string(),
+  eventId: z.string(),
+  startsAt: z.string(),
+  endsAt: z.string(),
+});
+
+/**
+ * Drag-to-move: thin action that only updates the time window.
+ * Used by the WeekView DnD handler — avoids re-validating the full event
+ * payload on every drag, and gives us a single revalidation target.
+ */
+export async function moveEventAction(input: z.infer<typeof moveEventSchema>) {
+  const data = moveEventSchema.parse(input);
+  const { membership } = await assertCanManage(data.tenantId);
+  if (!membership.tenant) throw new Error("Tenant not found");
+
+  const start = new Date(data.startsAt);
+  const end = new Date(data.endsAt);
+  if (end <= start) throw new Error("End time must be after start time");
+
+  const event = await db.event.findUnique({ where: { id: data.eventId } });
+  if (!event || event.tenantId !== data.tenantId) {
+    throw new Error("Event not found");
+  }
+
+  await db.event.update({
+    where: { id: data.eventId },
+    data: { startsAt: start, endsAt: end },
+  });
+
+  revalidatePath(`/t/${membership.tenant.slug}/coach/schedule`);
+}

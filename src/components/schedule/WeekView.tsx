@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useOptimistic, useRef, useState, useTransition } from "react";
 import { EVENT_TONE } from "@/lib/eventTone";
 import { cn } from "@/lib/utils";
 import {
@@ -13,22 +13,35 @@ import {
   startOfDay,
   startOfWeek,
 } from "date-fns";
+import {
+  DndContext,
+  PointerSensor,
+  useDraggable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import { toast } from "sonner";
+import { moveEventAction } from "@/actions/event";
 import type { Event, Location } from "@prisma/client";
 
 const HOUR_HEIGHT = 56; // px per hour
 const DAY_START_HOUR = 6;
 const DAY_END_HOUR = 22;
 const HOURS = Array.from({ length: DAY_END_HOUR - DAY_START_HOUR + 1 }, (_, i) => DAY_START_HOUR + i);
+const SNAP_MINUTES = 15;
 
 type EventWithLocation = Event & { location?: Location | null };
 
 export function WeekView({
+  tenantId,
   anchorDate,
   events,
   canEdit,
   onCellClick,
   onEventClick,
 }: {
+  tenantId: string;
   anchorDate: Date;
   events: EventWithLocation[];
   locations?: Location[];
@@ -43,21 +56,88 @@ export function WeekView({
     [weekStart]
   );
 
+  // Optimistic-events so drag-end updates the position immediately while the
+  // server action is in flight. Each item carries the canonical event id so
+  // the post-revalidate render replaces the optimistic copy.
+  const [optimisticEvents, applyOptimisticMove] = useOptimistic(
+    events,
+    (state, patch: { id: string; startsAt: Date; endsAt: Date }) =>
+      state.map((e) =>
+        e.id === patch.id ? { ...e, startsAt: patch.startsAt, endsAt: patch.endsAt } : e
+      )
+  );
+  const [, startTransition] = useTransition();
+
   const eventsByDay = useMemo(() => {
     const map = new Map<string, EventWithLocation[]>();
     for (const day of days) {
       map.set(day.toDateString(), []);
     }
-    for (const e of events) {
+    for (const e of optimisticEvents) {
       const dayKey = startOfDay(e.startsAt).toDateString();
       if (!map.has(dayKey)) continue;
       map.get(dayKey)!.push(e);
     }
     return map;
-  }, [events, days]);
+  }, [optimisticEvents, days]);
 
   const gridRef = useRef<HTMLDivElement>(null);
   const [hoverCell, setHoverCell] = useState<{ dayIdx: number; hour: number } | null>(null);
+
+  // DnD: drag tolerance keeps clicks from being mistaken for drags
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 4 },
+    })
+  );
+
+  function snapMinutes(min: number): number {
+    return Math.round(min / SNAP_MINUTES) * SNAP_MINUTES;
+  }
+
+  function handleDragEnd(e: DragEndEvent) {
+    if (!canEdit) return;
+    const id = String(e.active.id);
+    const event = events.find((x) => x.id === id);
+    if (!event) return;
+
+    const dx = e.delta.x;
+    const dy = e.delta.y;
+    // Day shift: each day column shares the same width — get it from the grid container
+    const grid = gridRef.current;
+    if (!grid) return;
+    const cols = grid.querySelectorAll<HTMLElement>("[data-day-col]");
+    if (cols.length !== 7) return;
+    const colWidth = cols[0].getBoundingClientRect().width;
+
+    const dayShift = Math.round(dx / colWidth);
+    const minuteShift = snapMinutes((dy / HOUR_HEIGHT) * 60);
+
+    if (dayShift === 0 && minuteShift === 0) return;
+
+    const newStart = new Date(event.startsAt);
+    newStart.setDate(newStart.getDate() + dayShift);
+    newStart.setMinutes(newStart.getMinutes() + minuteShift);
+
+    const newEnd = new Date(event.endsAt);
+    newEnd.setDate(newEnd.getDate() + dayShift);
+    newEnd.setMinutes(newEnd.getMinutes() + minuteShift);
+
+    // Optimistic must run inside a transition
+    startTransition(async () => {
+      applyOptimisticMove({ id, startsAt: newStart, endsAt: newEnd });
+      try {
+        await moveEventAction({
+          tenantId,
+          eventId: id,
+          startsAt: newStart.toISOString(),
+          endsAt: newEnd.toISOString(),
+        });
+      } catch (err) {
+        toast.error((err as Error).message);
+      }
+    });
+  }
 
   function handleCellMouseDown(e: React.MouseEvent, day: Date, hour: number) {
     if (!canEdit) return;
@@ -71,6 +151,7 @@ export function WeekView({
   }
 
   return (
+    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
     <div className="rounded-lg border border-line bg-pitch-800 overflow-x-auto">
       <div className="min-w-[680px]">
       {/* Day header strip */}
@@ -135,6 +216,7 @@ export function WeekView({
           return (
             <div
               key={day.toISOString()}
+              data-day-col
               className={cn(
                 "relative border-l border-line",
                 isCurrentDay && "bg-turf-400/[0.025]"
@@ -167,6 +249,7 @@ export function WeekView({
                   key={event.id}
                   event={event}
                   day={day}
+                  canEdit={canEdit}
                   onClick={() => onEventClick(event)}
                 />
               ))}
@@ -189,18 +272,25 @@ export function WeekView({
       </div>
       </div>
     </div>
+    </DndContext>
   );
 }
 
 function EventBlock({
   event,
   day,
+  canEdit,
   onClick,
 }: {
   event: Event & { location?: Location | null };
   day: Date;
+  canEdit: boolean;
   onClick: () => void;
 }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: event.id,
+    disabled: !canEdit,
+  });
   const tone = EVENT_TONE[event.type];
   const start = new Date(event.startsAt);
   const end = new Date(event.endsAt);
@@ -223,20 +313,44 @@ function EventBlock({
   const top = (topMin / 60) * HOUR_HEIGHT;
   const height = (heightMin / 60) * HOUR_HEIGHT - 2;
 
+  const dragTransform = transform
+    ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
+    : undefined;
+
   return (
-    <button
-      type="button"
-      onClick={onClick}
+    <div
+      ref={setNodeRef}
+      onClick={(e) => {
+        // Don't fire onClick if we're in the middle of a drag
+        if (isDragging) return;
+        e.stopPropagation();
+        onClick();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
       className={cn(
         "absolute inset-x-0.5 rounded-md px-2 py-1 text-left",
-        "border backdrop-blur-sm",
+        "border backdrop-blur-sm select-none",
         tone.bg,
         tone.border,
         tone.text,
-        "transition-transform duration-[120ms] hover:scale-[1.01] hover:z-10 hover:shadow-lg hover:shadow-pitch-950/40",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flood-400 focus-visible:z-10"
+        "transition-shadow duration-[120ms] hover:z-10 hover:shadow-lg hover:shadow-pitch-950/40",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flood-400 focus-visible:z-10",
+        canEdit && "cursor-grab active:cursor-grabbing",
+        isDragging && "opacity-60 z-20 shadow-2xl shadow-pitch-950/60"
       )}
-      style={{ top, height }}
+      style={{
+        top,
+        height,
+        transform: dragTransform,
+        touchAction: canEdit ? "none" : undefined,
+      }}
+      {...listeners}
+      {...attributes}
     >
       <div className="flex items-center gap-1 text-[10px] font-mono tracking-tight opacity-90 leading-none mb-0.5">
         {format(start, "h:mm")}
@@ -247,7 +361,7 @@ function EventBlock({
       {event.location && height > 50 && (
         <div className="text-[10px] opacity-70 truncate mt-0.5">@ {event.location.name}</div>
       )}
-    </button>
+    </div>
   );
 }
 
