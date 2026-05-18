@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { getInitials } from "@/lib/utils";
 import type { User } from "@prisma/client";
-import { LogOut, User as UserIcon } from "lucide-react";
+import { LogOut, User as UserIcon, Bell } from "lucide-react";
 import Link from "next/link";
 import { ThemeToggleItem } from "./ThemeToggleItem";
 
@@ -29,6 +29,12 @@ export function UserMenu({ user }: { user: User }) {
           <span className="text-xs font-normal text-ink-500 truncate">{user.email}</span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link href="/account/notifications" className="cursor-pointer">
+            <Bell className="h-4 w-4" />
+            Notifications
+          </Link>
+        </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href="/onboarding" className="cursor-pointer">
             <UserIcon className="h-4 w-4" />
