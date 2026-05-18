@@ -200,32 +200,16 @@ export async function createBookingAction(input: BookingInput) {
   // create a checkout session and redirect there.
   if (stripeEnabled() && tenant.stripeAccountId) {
     const stripe = getStripe();
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
+
+    // MONTHLY programs that have a Stripe Price attached become a subscription
+    // checkout — recurring billing handled by Stripe, with the destination
+    // charge wired through subscription_data so the merchant sees their own
+    // brand on the customer's invoices.
+    const isRecurring =
+      program.priceModel === "MONTHLY" && !!program.stripePriceId;
+
+    const baseSession = {
       customer_email: parentEmail,
-      line_items: [
-        {
-          price_data: {
-            currency: "usd",
-            product_data: {
-              name: program.name,
-              description: program.description ?? undefined,
-            },
-            unit_amount: program.price,
-          },
-          quantity: 1,
-        },
-      ],
-      payment_intent_data: {
-        application_fee_amount: 0,
-        transfer_data: { destination: tenant.stripeAccountId },
-        on_behalf_of: tenant.stripeAccountId,
-        metadata: {
-          tenantId: tenant.id,
-          invoiceId: invoice.id,
-          enrollmentEventId: event.id,
-        },
-      },
       metadata: {
         tenantId: tenant.id,
         invoiceId: invoice.id,
@@ -233,12 +217,58 @@ export async function createBookingAction(input: BookingInput) {
       },
       success_url: `${env.NEXTAUTH_URL}/${tenant.slug}/book/success?invoice=${invoice.id}&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${env.NEXTAUTH_URL}/${tenant.slug}/book/${program.id}?canceled=1`,
-    });
+    } as const;
 
-    await db.invoice.update({
-      where: { id: invoice.id },
-      data: { stripePaymentIntentId: session.payment_intent as string | null },
-    });
+    const session = isRecurring
+      ? await stripe.checkout.sessions.create({
+          ...baseSession,
+          mode: "subscription",
+          line_items: [{ price: program.stripePriceId!, quantity: 1 }],
+          subscription_data: {
+            on_behalf_of: tenant.stripeAccountId,
+            transfer_data: { destination: tenant.stripeAccountId },
+            application_fee_percent: 0,
+            metadata: {
+              tenantId: tenant.id,
+              invoiceId: invoice.id,
+              enrollmentEventId: event.id,
+            },
+          },
+        })
+      : await stripe.checkout.sessions.create({
+          ...baseSession,
+          mode: "payment",
+          line_items: [
+            {
+              price_data: {
+                currency: "usd",
+                product_data: {
+                  name: program.name,
+                  description: program.description ?? undefined,
+                },
+                unit_amount: program.price,
+              },
+              quantity: 1,
+            },
+          ],
+          payment_intent_data: {
+            application_fee_amount: 0,
+            transfer_data: { destination: tenant.stripeAccountId },
+            on_behalf_of: tenant.stripeAccountId,
+            metadata: {
+              tenantId: tenant.id,
+              invoiceId: invoice.id,
+              enrollmentEventId: event.id,
+            },
+          },
+        });
+
+    if (!isRecurring) {
+      await db.invoice.update({
+        where: { id: invoice.id },
+        data: { stripePaymentIntentId: session.payment_intent as string | null },
+      });
+    }
 
     if (session.url) redirect(session.url);
   }

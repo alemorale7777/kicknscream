@@ -198,6 +198,11 @@ model Program {
   cohortEnd         DateTime?
   bookingLinkToken  String?      @unique
   thumbnailUrl      String?
+  // Stripe — set only for recurring (MONTHLY) services. Stored on the
+  // Program so the booking flow can attach the right price to a new
+  // subscription without re-creating products on every charge.
+  stripeProductId   String?
+  stripePriceId     String?
   events            Event[]
   enrollments       Enrollment[]
   tenant            Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
