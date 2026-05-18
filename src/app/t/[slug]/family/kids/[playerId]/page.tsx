@@ -21,9 +21,17 @@ export default async function FamilyKidPage({
   const { slug, playerId } = await params;
   const { tenant, user } = await requireTenant(slug);
 
-  const player = await db.player.findUnique({ where: { id: playerId } });
-  // Strict parent-link check — 404 if not the parent
-  if (!player || player.tenantId !== tenant.id || player.parentId !== user.id) {
+  const player = await db.player.findUnique({
+    where: { id: playerId },
+    include: { parentLinks: { select: { parentUserId: true } } },
+  });
+  // 404 unless this kid is linked to the current user — either via the
+  // legacy parentId pointer or the ParentPlayer junction.
+  const linked =
+    !!player &&
+    (player.parentId === user.id ||
+      player.parentLinks.some((l) => l.parentUserId === user.id));
+  if (!player || player.tenantId !== tenant.id || !linked) {
     notFound();
   }
 

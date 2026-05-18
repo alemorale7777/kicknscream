@@ -37,7 +37,13 @@ export default async function FamilyHomePage({
   const { tenant, user } = await requireTenant(slug);
 
   const players = await db.player.findMany({
-    where: { tenantId: tenant.id, parentId: user.id },
+    where: {
+      tenantId: tenant.id,
+      OR: [
+        { parentId: user.id },
+        { parentLinks: { some: { parentUserId: user.id } } },
+      ],
+    },
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
   });
 
