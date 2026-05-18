@@ -23,6 +23,42 @@ const schema = z.object({
 });
 
 /**
+ * Issues a calendar-feed token for the current user if they don't already
+ * have one. Returns the token (caller renders it into a subscribe URL).
+ */
+export async function ensureCalendarTokenAction(): Promise<string> {
+  const user = await getCurrentUser();
+  if (!user) throw new Error("Not authenticated");
+  const existing = await db.userPreferences.findUnique({
+    where: { userId: user.id },
+  });
+  if (existing?.calendarToken) return existing.calendarToken;
+  const token = crypto.randomUUID().replace(/-/g, "");
+  await db.userPreferences.upsert({
+    where: { userId: user.id },
+    create: { userId: user.id, calendarToken: token },
+    update: { calendarToken: token },
+  });
+  return token;
+}
+
+/**
+ * Rotates the calendar token, invalidating any previous subscription URLs.
+ * Returns the new token.
+ */
+export async function rotateCalendarTokenAction(): Promise<string> {
+  const user = await getCurrentUser();
+  if (!user) throw new Error("Not authenticated");
+  const token = crypto.randomUUID().replace(/-/g, "");
+  await db.userPreferences.upsert({
+    where: { userId: user.id },
+    create: { userId: user.id, calendarToken: token },
+    update: { calendarToken: token },
+  });
+  return token;
+}
+
+/**
  * Upserts the current user's notification preferences. Each call patches
  * only the fields the form actually changed — undefined values are dropped
  * so partial updates don't clobber unrelated toggles.

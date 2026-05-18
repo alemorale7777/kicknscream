@@ -622,6 +622,10 @@ model UserPreferences {
   smsOptIn       Boolean  @default(false)
   smsReminders   Boolean  @default(false)
   smsPayments    Boolean  @default(false)
+  // Unguessable token used in the /api/calendar/[token].ics subscribe URL.
+  // Stable across refreshes so the parent's calendar app keeps polling the
+  // same URL; rotated only if the user explicitly regenerates.
+  calendarToken  String?  @unique
   updatedAt      DateTime @updatedAt
   createdAt      DateTime @default(now())
 }

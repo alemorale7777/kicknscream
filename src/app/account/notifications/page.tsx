@@ -1,8 +1,10 @@
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Card } from "@/components/ui/card";
 import { NotificationPreferencesForm } from "@/components/settings/NotificationPreferencesForm";
+import { CalendarSubscribeCard } from "@/components/settings/CalendarSubscribeCard";
 import { Wordmark } from "@/components/brand/Wordmark";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
@@ -22,6 +24,13 @@ export default async function AccountNotificationsPage() {
   const userId = session.user.id;
 
   const prefs = await db.userPreferences.findUnique({ where: { userId } });
+
+  // Build the origin so the subscribe card can render absolute URLs the
+  // user can paste into Apple/Google Calendar.
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "kicknscream.vercel.app";
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  const origin = `${proto}://${host}`;
   const initial = {
     emailReminders: prefs?.emailReminders ?? true,
     emailPayments: prefs?.emailPayments ?? true,
@@ -64,6 +73,13 @@ export default async function AccountNotificationsPage() {
         </header>
         <Card className="p-5">
           <NotificationPreferencesForm initial={initial} />
+        </Card>
+
+        <Card className="p-5">
+          <CalendarSubscribeCard
+            initialToken={prefs?.calendarToken ?? null}
+            origin={origin}
+          />
         </Card>
       </div>
     </main>
