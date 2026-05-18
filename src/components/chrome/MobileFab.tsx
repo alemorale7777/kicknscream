@@ -52,7 +52,9 @@ export function MobileFab({ tenantSlug }: { tenantSlug: string }) {
     {
       label: "Send broadcast",
       icon: MessageSquare,
-      href: `${base}/messages?new=broadcast`,
+      // /coach/comms is the one-way broadcast composer; /coach/messages
+      // is the threaded conversation surface. Both exist intentionally.
+      href: `${base}/comms`,
     },
   ];
 

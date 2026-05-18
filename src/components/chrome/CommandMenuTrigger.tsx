@@ -63,7 +63,7 @@ function actionsFor(slug: string, type: TenantType): ActionGroup[] {
       { label: "Add a player", href: `${base}/roster?new=1`, icon: Plus, keywords: ["create"] },
       { label: "New event", href: `${base}/schedule?new=1`, icon: Plus, keywords: ["create"] },
       { label: "New service", href: `${base}/programs?new=1`, icon: Plus, keywords: ["create", "program"] },
-      { label: "Send broadcast", href: `${base}/messages?new=broadcast`, icon: Wand2, keywords: ["email"] },
+      { label: "Send broadcast", href: `${base}/comms`, icon: Wand2, keywords: ["email"] },
       { label: "View public page", href: `/${slug}`, icon: ExternalLink, keywords: ["public", "preview"] },
     ],
   };
