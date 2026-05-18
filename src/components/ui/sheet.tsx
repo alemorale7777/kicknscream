@@ -34,7 +34,11 @@ const SheetContent = React.forwardRef<
       data-sheet-content=""
       className={cn(
         "fixed inset-y-0 right-0 z-50 flex h-full w-full max-w-[480px] flex-col",
-        "border-l border-line bg-pitch-800 shadow-2xl shadow-pitch-950/60",
+        "bg-pitch-800 shadow-2xl shadow-pitch-950/60",
+        // Inside-edge hairline: a 1px pitch-700 line just inside the dimmed
+        // overlay lifts the drawer from the backdrop without competing with
+        // the strong shadow.
+        "border-l border-line ring-1 ring-inset ring-pitch-700/60",
         "focus:outline-none",
         className
       )}

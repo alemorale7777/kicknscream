@@ -421,6 +421,31 @@ export function EventDialog({
             </div>
           )}
 
+          {isEdit && !confirmingDelete && (
+            <div className="mt-8 pt-6 border-t border-danger/15">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-danger/80 mb-2">
+                Danger zone
+              </p>
+              <button
+                type="button"
+                onClick={() => setConfirmingDelete(true)}
+                disabled={pending}
+                className="w-full flex items-center justify-between gap-3 rounded-md border border-danger/30 bg-danger/5 px-4 py-3 text-left text-sm transition-colors hover:bg-danger/10 disabled:opacity-50"
+              >
+                <span className="flex items-start gap-3">
+                  <Trash2 className="h-4 w-4 text-danger mt-0.5 shrink-0" />
+                  <span>
+                    <span className="block font-medium text-ink-50">Delete this event</span>
+                    <span className="block text-xs text-ink-500 mt-0.5">
+                      Removes the event, attendance, and session notes. This can&apos;t be undone.
+                    </span>
+                  </span>
+                </span>
+                <span className="text-xs text-danger/80 font-medium shrink-0">Delete →</span>
+              </button>
+            </div>
+          )}
+
           {isEdit && confirmingDelete && (
             <div className="mt-6 rounded-md border border-danger/40 bg-danger/10 p-4 space-y-3">
               <div className="flex items-start gap-2">
@@ -489,21 +514,7 @@ export function EventDialog({
         </SheetBody>
 
         <SheetFooter>
-          {isEdit && !confirmingDelete ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setConfirmingDelete(true)}
-              disabled={pending}
-              className="text-danger hover:bg-danger/10"
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete
-            </Button>
-          ) : (
-            <span />
-          )}
+          <span />
           <div className="flex items-center gap-2">
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={pending}>
               Cancel
