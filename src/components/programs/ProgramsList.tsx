@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +54,8 @@ export function ProgramsList({
   canEdit: boolean;
   tenantLabel: string;
 }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Program | undefined>();
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -66,6 +69,20 @@ export function ProgramsList({
     setEditing(undefined);
     setDialogOpen(true);
   }
+
+  // ⌘K + other deep-links use ?new=1 to land directly on the New service
+  // dialog. Defer via microtask to keep React Compiler happy.
+  useEffect(() => {
+    if (!canEdit) return;
+    if (searchParams.get("new") !== "1") return;
+    Promise.resolve().then(() => {
+      openCreate();
+      const url = new URL(window.location.href);
+      url.searchParams.delete("new");
+      router.replace(url.pathname + (url.search || ""));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, canEdit]);
   function openEdit(p: Program) {
     setEditing(p);
     setDialogOpen(true);

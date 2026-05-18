@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -53,12 +54,28 @@ export function RosterList({
   showClubFields: boolean;
 }) {
   type SortKey = "name" | "age" | "parent" | "jersey";
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [query, setQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState<PlayerWithParent | undefined>(undefined);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("name");
+
+  // ⌘K + deep-links use ?new=1 to land directly on the New player dialog.
+  // Defer via microtask to keep React Compiler happy.
+  useEffect(() => {
+    if (searchParams.get("new") !== "1") return;
+    Promise.resolve().then(() => {
+      setEditingPlayer(undefined);
+      setDialogOpen(true);
+      const url = new URL(window.location.href);
+      url.searchParams.delete("new");
+      router.replace(url.pathname + (url.search || ""));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [, startTransition] = useTransition();
 

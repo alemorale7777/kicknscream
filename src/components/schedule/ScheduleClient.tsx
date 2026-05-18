@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { WeekView } from "./WeekView";
@@ -46,6 +46,7 @@ export function ScheduleClient({
   canEdit: boolean;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [view, setView] = useState<ViewMode>("week");
   const [anchorDate, setAnchorDate] = useState<Date>(new Date());
 
@@ -102,6 +103,21 @@ export function ScheduleClient({
     setEditingEvent(undefined);
     setDialogOpen(true);
   }
+
+  // ⌘K and other deep-links use ?new=1 to land directly on the New event
+  // dialog. Defer the open via a microtask to keep React Compiler happy
+  // (no synchronous setState inside an effect body).
+  useEffect(() => {
+    if (!canEdit) return;
+    if (searchParams.get("new") !== "1") return;
+    Promise.resolve().then(() => {
+      openCreate();
+      const url = new URL(window.location.href);
+      url.searchParams.delete("new");
+      router.replace(url.pathname + (url.search || ""));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, canEdit]);
 
   function handleEventClick(e: EventWithLocation) {
     if (!canEdit) {
