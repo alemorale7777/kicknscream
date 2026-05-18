@@ -106,9 +106,13 @@ export default async function PublicTenantPage({
   const accentColor = tenant.primaryColor ?? "#1FB663";
 
   // JSON-LD structured data — LocalBusiness + Offer per program.
-  // Helps Google Rich Results, knowledge panels, etc.
+  // Helps Google Rich Results, knowledge panels, etc. For COACH tenants we
+  // additionally emit a Person record so the coach themselves shows up in
+  // people-search.
   const baseUrl = "https://kicknscream.vercel.app";
-  const jsonLd = {
+  const reviews = parseTestimonials(tenant.testimonials);
+
+  const localBusiness: Record<string, unknown> = {
     "@context": "https://schema.org",
     "@type": "LocalBusiness",
     "@id": `${baseUrl}/${tenant.slug}`,
@@ -131,6 +135,36 @@ export default async function PublicTenantPage({
       url: `${baseUrl}/${tenant.slug}/book/${p.id}`,
     })),
   };
+  if (reviews.length > 0) {
+    localBusiness.review = reviews.map((r) => ({
+      "@type": "Review",
+      author: { "@type": "Person", name: r.author },
+      reviewBody: r.quote,
+      reviewRating: {
+        "@type": "Rating",
+        ratingValue: 5,
+        bestRating: 5,
+      },
+    }));
+    localBusiness.aggregateRating = {
+      "@type": "AggregateRating",
+      ratingValue: 5,
+      reviewCount: reviews.length,
+    };
+  }
+  const coachPerson =
+    tenant.type === "COACH"
+      ? {
+          "@context": "https://schema.org",
+          "@type": "Person",
+          "@id": `${baseUrl}/${tenant.slug}#person`,
+          name: tenant.name,
+          url: `${baseUrl}/${tenant.slug}`,
+          image: tenant.logoUrl ?? undefined,
+          description: tenant.bio ?? copy.tagline,
+          jobTitle: "Soccer coach",
+        }
+      : null;
 
   const faqs = faqsFor(tenant.type, tenant.name);
 
@@ -139,8 +173,15 @@ export default async function PublicTenantPage({
       <script
         type="application/ld+json"
         // eslint-disable-next-line react/no-danger
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusiness) }}
       />
+      {coachPerson && (
+        <script
+          type="application/ld+json"
+          // eslint-disable-next-line react/no-danger
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(coachPerson) }}
+        />
+      )}
       <script
         type="application/ld+json"
         // eslint-disable-next-line react/no-danger
@@ -218,6 +259,18 @@ export default async function PublicTenantPage({
           )}
         </div>
       </section>
+
+      {/* Coach bio — markdown copy block, COACH tenants only */}
+      {tenant.bio && (
+        <section className="relative z-10 px-5 lg:px-12 mt-20 max-w-3xl">
+          <p className="text-xs uppercase tracking-[0.2em] text-ink-500 mb-2">
+            {tenant.type === "COACH" ? "About the coach" : "About"}
+          </p>
+          <div className="text-base text-ink-300 leading-relaxed whitespace-pre-wrap text-pretty">
+            {tenant.bio}
+          </div>
+        </section>
+      )}
 
       {/* Services / programs */}
       {programs.length > 0 && (
@@ -322,6 +375,9 @@ export default async function PublicTenantPage({
         )}
       </section>
 
+      {/* Testimonials */}
+      <Testimonials raw={tenant.testimonials} />
+
       {/* CTA card */}
       <section className="relative z-10 px-5 lg:px-12 mt-20 max-w-5xl">
         <Card className="relative overflow-hidden p-8 lg:p-12 text-center">
@@ -378,6 +434,50 @@ export default async function PublicTenantPage({
         </Link>
       </footer>
     </main>
+  );
+}
+
+type Testimonial = { author: string; role?: string; quote: string };
+
+function parseTestimonials(raw: unknown): Testimonial[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((t): Testimonial[] => {
+    if (!t || typeof t !== "object") return [];
+    const obj = t as Record<string, unknown>;
+    if (typeof obj.author !== "string" || typeof obj.quote !== "string") {
+      return [];
+    }
+    return [
+      {
+        author: obj.author,
+        role: typeof obj.role === "string" ? obj.role : undefined,
+        quote: obj.quote,
+      },
+    ];
+  });
+}
+
+function Testimonials({ raw }: { raw: unknown }) {
+  const items = parseTestimonials(raw);
+  if (items.length === 0) return null;
+  return (
+    <section className="relative z-10 px-5 lg:px-12 mt-20 max-w-5xl">
+      <p className="text-xs uppercase tracking-[0.2em] text-ink-500 mb-4">
+        What players & parents say
+      </p>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {items.map((t, i) => (
+          <Card key={i} className="p-5 border-line/60">
+            <p className="text-flood-400 text-2xl leading-none font-serif">&ldquo;</p>
+            <blockquote className="text-ink-300 leading-relaxed mt-1">
+              {t.quote}
+            </blockquote>
+            <p className="text-sm text-ink-50 font-medium mt-3">{t.author}</p>
+            {t.role && <p className="text-xs text-ink-500">{t.role}</p>}
+          </Card>
+        ))}
+      </div>
+    </section>
   );
 }
 

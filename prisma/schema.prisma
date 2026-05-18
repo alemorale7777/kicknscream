@@ -88,6 +88,10 @@ model Tenant {
   logoUrl                 String?
   primaryColor            String?
   stripeAccountId         String?
+  // Public-page enrichment — markdown bio (COACH tenants) and a list of
+  // testimonials as { author, role, quote } objects. Surfaced on /{slug}.
+  bio                     String?
+  testimonials            Json?
   // KYC mirror columns kept fresh by the account.updated webhook
   stripeChargesEnabled    Boolean               @default(false)
   stripePayoutsEnabled    Boolean               @default(false)
