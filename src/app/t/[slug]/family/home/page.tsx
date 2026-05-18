@@ -6,6 +6,7 @@ import { KidsCarousel } from "@/components/family/KidsCarousel";
 import { OutstandingStrip } from "@/components/family/OutstandingStrip";
 import { Card } from "@/components/ui/card";
 import { getEventWeather } from "@/lib/weather";
+import { loadUpcomingFamilyEvents } from "@/lib/family/events";
 import { ScrollText, ArrowRight } from "lucide-react";
 
 export const metadata = { title: "Home" };
@@ -40,21 +41,8 @@ export default async function FamilyHomePage({
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
   });
 
-  const playerNames = players.map((p) => `${p.firstName} ${p.lastName}`);
-
-  const [nextEvents, invoices, pendingWaivers] = await Promise.all([
-    playerNames.length > 0
-      ? db.event.findMany({
-          where: {
-            tenantId: tenant.id,
-            startsAt: { gte: new Date() },
-            title: { in: playerNames },
-          },
-          include: { location: true },
-          orderBy: { startsAt: "asc" },
-          take: playerNames.length,
-        })
-      : Promise.resolve([]),
+  const [familyEvents, invoices, pendingWaivers] = await Promise.all([
+    loadUpcomingFamilyEvents(tenant.id, user.id, { limit: 50 }),
     db.invoice.findMany({
       where: { tenantId: tenant.id, payerEmail: user.email ?? "@@none@@" },
       orderBy: { createdAt: "desc" },
@@ -64,11 +52,13 @@ export default async function FamilyHomePage({
     countPendingWaivers(tenant.id, players.map((p) => p.id)),
   ]);
 
-  // Match a next-session per kid: first event whose title contains the player's name
+  // Pick the soonest event each kid is enrolled into (familyEvents is
+  // already sorted ascending by startsAt — first match wins).
   const heroByKid = players.map((p) => ({
     player: p,
     event:
-      nextEvents.find((e) => e.title.includes(`${p.firstName} ${p.lastName}`)) ?? null,
+      familyEvents.find((row) => row.players.some((rp) => rp.id === p.id))
+        ?.event ?? null,
   }));
 
   // Forecast lookup per kid hero — parallel and gracefully nullable.

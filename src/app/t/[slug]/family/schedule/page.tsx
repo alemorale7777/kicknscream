@@ -1,9 +1,10 @@
 import { requireTenant } from "@/lib/tenant";
-import { db } from "@/lib/db";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { format } from "date-fns";
-import { Calendar, ArrowRight } from "lucide-react";
+import { Calendar, ArrowRight, MapPin } from "lucide-react";
+import { loadUpcomingFamilyEvents } from "@/lib/family/events";
 
 export const metadata = { title: "Schedule" };
 
@@ -15,31 +16,18 @@ export default async function FamilySchedulePage({
   const { slug } = await params;
   const { tenant, user } = await requireTenant(slug);
 
-  const players = await db.player.findMany({
-    where: { tenantId: tenant.id, parentId: user.id },
-  });
-  const names = players.map((p) => `${p.firstName} ${p.lastName}`);
-
-  const events = names.length
-    ? await db.event.findMany({
-        where: {
-          tenantId: tenant.id,
-          startsAt: { gte: new Date() },
-          title: { in: names },
-        },
-        include: { location: true },
-        orderBy: { startsAt: "asc" },
-        take: 50,
-      })
-    : [];
+  const rows = await loadUpcomingFamilyEvents(tenant.id, user.id);
 
   return (
     <div className="space-y-6">
       <header>
         <p className="text-sm uppercase tracking-[0.2em] text-ink-500">Schedule</p>
         <h1 className="text-3xl font-bold tracking-[-0.03em]">Your family calendar</h1>
+        <p className="text-sm text-ink-500 mt-1">
+          Every upcoming session for every kid you&apos;re linked to.
+        </p>
       </header>
-      {events.length === 0 ? (
+      {rows.length === 0 ? (
         <Card className="p-10 text-center border-dashed">
           <Calendar className="h-8 w-8 text-ink-700 mx-auto mb-3" />
           <p className="text-ink-300 font-medium">Nothing on the calendar</p>
@@ -52,22 +40,40 @@ export default async function FamilySchedulePage({
         </Card>
       ) : (
         <div className="space-y-2">
-          {events.map((ev) => (
-            <Card key={ev.id} className="p-3 flex items-center gap-3">
+          {rows.map(({ event, players }) => (
+            <Card key={event.id} className="p-3 flex items-center gap-3">
               <div className="text-center w-14 shrink-0 border-r border-line pr-3 font-mono">
                 <p className="text-[10px] uppercase tracking-wider text-ink-500">
-                  {format(ev.startsAt, "MMM")}
+                  {format(event.startsAt, "MMM")}
                 </p>
                 <p className="text-xl font-bold leading-none mt-0.5">
-                  {format(ev.startsAt, "d")}
+                  {format(event.startsAt, "d")}
                 </p>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-ink-50 truncate">{ev.title}</p>
-                <p className="text-xs text-ink-500">
-                  {format(ev.startsAt, "EEE h:mm a")}
-                  {ev.location && ` · ${ev.location.name}`}
+                <p className="font-semibold text-ink-50 truncate">{event.title}</p>
+                <p className="text-xs text-ink-500 mt-0.5 inline-flex items-center gap-2 flex-wrap">
+                  <span>{format(event.startsAt, "EEE h:mm a")}</span>
+                  {event.location && (
+                    <span className="inline-flex items-center gap-0.5">
+                      <MapPin className="h-3 w-3" />
+                      {event.location.name}
+                    </span>
+                  )}
                 </p>
+                {players.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {players.map((p) => (
+                      <Badge
+                        key={p.id}
+                        variant="outline"
+                        className="border-turf-400/30 text-turf-300 bg-turf-400/5 text-[10px]"
+                      >
+                        {p.firstName}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
               </div>
             </Card>
           ))}
