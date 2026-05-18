@@ -6,7 +6,20 @@ import { navForTenantType } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 import type { Tenant, Role } from "@prisma/client";
 
-export function SideNav({ tenant }: { tenant: Tenant; role?: Role }) {
+/**
+ * `badges` is a small map keyed by the lowercased final nav-item label
+ * ({"messages": 3}). Keeps the contract simple — no need to thread feature
+ * keys through navForTenantType — and matches by lowercase so callers
+ * don't have to care about display casing.
+ */
+export function SideNav({
+  tenant,
+  badges,
+}: {
+  tenant: Tenant;
+  role?: Role;
+  badges?: Record<string, number>;
+}) {
   const pathname = usePathname();
   const items = navForTenantType(tenant.type, tenant.slug);
 
@@ -19,6 +32,7 @@ export function SideNav({ tenant }: { tenant: Tenant; role?: Role }) {
               ? pathname === item.href
               : pathname?.startsWith(item.href);
           const Icon = item.icon;
+          const badgeCount = badges?.[item.label.toLowerCase()] ?? 0;
           return (
             <Link
               key={item.href}
@@ -32,7 +46,15 @@ export function SideNav({ tenant }: { tenant: Tenant; role?: Role }) {
               )}
             >
               <Icon className={cn("h-4 w-4 shrink-0", active && "text-turf-300")} />
-              <span className="truncate">{item.label}</span>
+              <span className="truncate flex-1">{item.label}</span>
+              {badgeCount > 0 && (
+                <span
+                  aria-label={`${badgeCount} unread`}
+                  className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full bg-turf-400 text-pitch-950 text-[10px] font-mono font-semibold tabular-nums"
+                >
+                  {badgeCount > 99 ? "99+" : badgeCount}
+                </span>
+              )}
             </Link>
           );
         })}

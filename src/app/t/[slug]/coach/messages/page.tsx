@@ -24,7 +24,13 @@ export default async function MessagesPage({
         messages: {
           orderBy: { createdAt: "desc" },
           take: 1,
-          select: { body: true, senderUserId: true, createdAt: true, readAt: true },
+          select: {
+            body: true,
+            senderUserId: true,
+            createdAt: true,
+            readAt: true,
+            channel: true,
+          },
         },
       },
     }),
@@ -56,6 +62,7 @@ export default async function MessagesPage({
       lastMessageAt: t.lastMessageAt.toISOString(),
       lastMessageBody: last?.body ?? null,
       lastMessageMine: last ? last.senderUserId === user.id : false,
+      lastMessageChannel: last?.channel ?? null,
       unread: !!last && last.senderUserId !== user.id && !last.readAt,
       others,
     };

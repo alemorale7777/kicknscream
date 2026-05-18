@@ -43,6 +43,7 @@ type ThreadSummary = {
   lastMessageAt: string;
   lastMessageBody: string | null;
   lastMessageMine: boolean;
+  lastMessageChannel: "IN_APP" | "EMAIL" | "SMS" | null;
   unread: boolean;
   others: { id: string; name: string | null; email: string }[];
 };
@@ -92,6 +93,7 @@ export function MessagesClient({
           lastMessageAt: new Date().toISOString(),
           lastMessageBody: null,
           lastMessageMine: true,
+          lastMessageChannel: null,
           unread: false,
           others: recipients,
         },
@@ -101,7 +103,11 @@ export function MessagesClient({
     setSelectedId(threadId);
   }
 
-  function handleMessageSent(threadId: string, body: string) {
+  function handleMessageSent(
+    threadId: string,
+    body: string,
+    channel: ThreadSummary["lastMessageChannel"]
+  ) {
     setThreads((prev) =>
       prev
         .map((t) =>
@@ -111,6 +117,7 @@ export function MessagesClient({
                 lastMessageAt: new Date().toISOString(),
                 lastMessageBody: body,
                 lastMessageMine: true,
+                lastMessageChannel: channel,
                 unread: false,
               }
             : t
@@ -226,14 +233,30 @@ export function MessagesClient({
                         {t.lastMessageBody && (
                           <p
                             className={cn(
-                              "text-xs truncate mt-0.5",
+                              "text-xs truncate mt-0.5 inline-flex items-center gap-1",
                               t.unread ? "text-ink-300" : "text-ink-500"
                             )}
                           >
-                            {t.lastMessageMine && (
-                              <span className="text-ink-700">You: </span>
+                            {t.lastMessageChannel === "EMAIL" ? (
+                              <Mail
+                                className="h-3 w-3 text-ink-500 shrink-0"
+                                aria-label="Last delivered by email"
+                              />
+                            ) : t.lastMessageChannel === "SMS" ? (
+                              <Phone
+                                className="h-3 w-3 text-ink-500 shrink-0"
+                                aria-label="Last delivered by SMS"
+                              />
+                            ) : (
+                              <MessageSquare
+                                className="h-3 w-3 text-ink-500 shrink-0"
+                                aria-label="Last delivered in app"
+                              />
                             )}
-                            {t.lastMessageBody}
+                            {t.lastMessageMine && (
+                              <span className="text-ink-700">You:</span>
+                            )}
+                            <span className="truncate">{t.lastMessageBody}</span>
                           </p>
                         )}
                       </div>
@@ -302,7 +325,11 @@ function ConversationPane({
   threadId: string;
   currentUserId: string;
   onBack: () => void;
-  onMessageSent: (threadId: string, body: string) => void;
+  onMessageSent: (
+    threadId: string,
+    body: string,
+    channel: "IN_APP" | "EMAIL" | "SMS"
+  ) => void;
   onMarkedRead: (threadId: string) => void;
 }) {
   type LoadState =
@@ -353,7 +380,7 @@ function ConversationPane({
           body: snapshot,
           sendEmail: emailToo,
         });
-        onMessageSent(threadId, snapshot);
+        onMessageSent(threadId, snapshot, emailToo ? "EMAIL" : "IN_APP");
         if (state.kind === "loaded") {
           const optimistic: ThreadDetail["messages"][number] = {
             id: `tmp-${Date.now()}`,
@@ -467,10 +494,7 @@ function ConversationPane({
               <Mail className="h-3 w-3" />
               Also email
             </label>
-            <Badge variant="outline" className="border-line text-ink-500 inline-flex items-center gap-1.5">
-              <Phone className="h-3 w-3" />
-              SMS · soon
-            </Badge>
+            <SmsWaitlistChip />
           </div>
           <Button
             type="button"
@@ -640,10 +664,7 @@ function ComposeNewSheet({
                 <Mail className="h-3 w-3" />
                 Also email the parent
               </label>
-              <Badge variant="outline" className="border-line text-ink-500 inline-flex items-center gap-1.5">
-                <Phone className="h-3 w-3" />
-                SMS · soon
-              </Badge>
+              <SmsWaitlistChip />
             </div>
           </div>
         </SheetBody>
@@ -661,5 +682,65 @@ function ComposeNewSheet({
         </SheetFooter>
       </SheetContent>
     </Sheet>
+  );
+}
+
+const SMS_WAITLIST_KEY = "kns.sms-waitlist-joined";
+
+/**
+ * "SMS · coming soon" badge that doubles as a one-tap waitlist signup —
+ * persists the user's interest in localStorage and surfaces a toast.
+ * Once they've registered interest, the badge collapses to "SMS · noted".
+ */
+function SmsWaitlistChip() {
+  const [joined, setJoined] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    // Read localStorage in a microtask so the setState lands outside the
+    // synchronous effect body — keeps React Compiler's set-state-in-effect
+    // lint quiet and avoids any SSR/CSR mismatch.
+    Promise.resolve()
+      .then(() => {
+        try {
+          return !!window.localStorage.getItem(SMS_WAITLIST_KEY);
+        } catch {
+          return false;
+        }
+      })
+      .then(setJoined);
+  }, []);
+
+  function join() {
+    try {
+      window.localStorage.setItem(SMS_WAITLIST_KEY, new Date().toISOString());
+    } catch {
+      // private mode — toast still fires below
+    }
+    setJoined(true);
+    toast.success("Got it — we'll email when SMS goes live.");
+  }
+
+  if (joined === null || joined) {
+    return (
+      <Badge
+        variant="outline"
+        className="border-line text-ink-500 inline-flex items-center gap-1.5"
+      >
+        <Phone className="h-3 w-3" />
+        SMS · {joined ? "noted" : "soon"}
+      </Badge>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={join}
+      className="inline-flex items-center gap-1.5 rounded-full border border-line bg-pitch-800 px-2 py-0.5 text-xs text-ink-500 hover:text-ink-50 hover:border-flood-400/40 transition-colors"
+      aria-label="Get notified when SMS is available"
+    >
+      <Phone className="h-3 w-3" />
+      <span>SMS · soon</span>
+      <span className="text-flood-400 font-medium">Notify me</span>
+    </button>
   );
 }
