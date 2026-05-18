@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { BookingForm } from "@/components/book/BookingForm";
 import { formatCents } from "@/lib/utils";
 import { ArrowLeft, AlertTriangle } from "lucide-react";
+import { addDays } from "date-fns";
 
 export const metadata = { title: "Book a session" };
 
@@ -29,6 +30,24 @@ export default async function BookProgramPage({
 
   const program = await db.program.findUnique({ where: { id: programId } });
   if (!program || program.tenantId !== tenant.id) notFound();
+
+  // Look up every event already on the calendar in the booking window. We
+  // pass starts-at strings to the client so it can grey out occupied slots
+  // when the parent picks a date. 60-day window mirrors the form's max
+  // selectable date.
+  const windowStart = new Date();
+  const windowEnd = addDays(new Date(), 65);
+  const busyEvents = await db.event.findMany({
+    where: {
+      tenantId: tenant.id,
+      startsAt: { gte: windowStart, lte: windowEnd },
+    },
+    select: { startsAt: true, endsAt: true },
+  });
+  const busyStartsAt = busyEvents.map((e) => ({
+    startsAt: e.startsAt.toISOString(),
+    endsAt: e.endsAt.toISOString(),
+  }));
   if (program.archived) {
     return (
       <Shell>
@@ -79,7 +98,11 @@ export default async function BookProgramPage({
         </p>
       </header>
 
-      <BookingForm tenantSlug={slug} program={program} />
+      <BookingForm
+        tenantSlug={slug}
+        program={program}
+        busyStartsAt={busyStartsAt}
+      />
     </Shell>
   );
 }

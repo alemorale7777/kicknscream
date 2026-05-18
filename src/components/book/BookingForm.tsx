@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -29,7 +29,7 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-const SUGGESTED_TIMES = [
+const CANDIDATE_TIMES = [
   "09:00",
   "10:00",
   "11:00",
@@ -42,7 +42,42 @@ const SUGGESTED_TIMES = [
   "19:00",
 ];
 
-export function BookingForm({ tenantSlug, program }: { tenantSlug: string; program: Program }) {
+type BusyEvent = { startsAt: string; endsAt: string };
+
+/**
+ * Returns the time slots that don't overlap any existing event on `dateStr`.
+ * Each candidate is assumed to run for `durationMin` (typically 60 min) and
+ * is filtered out if it intersects any busy range. Also drops slots that
+ * are in the past — the booking window starts tomorrow but UTC drift means
+ * "today" can creep in on edge cases.
+ */
+function computeAvailableTimes(
+  dateStr: string,
+  durationMin: number,
+  busy: BusyEvent[]
+): string[] {
+  const now = Date.now();
+  return CANDIDATE_TIMES.filter((t) => {
+    const slotStart = new Date(`${dateStr}T${t}:00`);
+    const slotEnd = new Date(slotStart.getTime() + durationMin * 60 * 1000);
+    if (slotStart.getTime() < now) return false;
+    return !busy.some((b) => {
+      const bStart = new Date(b.startsAt).getTime();
+      const bEnd = new Date(b.endsAt).getTime();
+      return bStart < slotEnd.getTime() && bEnd > slotStart.getTime();
+    });
+  });
+}
+
+export function BookingForm({
+  tenantSlug,
+  program,
+  busyStartsAt = [],
+}: {
+  tenantSlug: string;
+  program: Program;
+  busyStartsAt?: BusyEvent[];
+}) {
   const [pending, startTransition] = useTransition();
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const minDate = format(addDays(new Date(), 1), "yyyy-MM-dd");
@@ -63,6 +98,12 @@ export function BookingForm({ tenantSlug, program }: { tenantSlug: string; progr
   });
 
   const watchedTime = useWatch({ control, name: "startTime" });
+  const watchedDate = useWatch({ control, name: "date" });
+  const availableTimes = useMemo(
+    () => computeAvailableTimes(watchedDate, 60, busyStartsAt),
+    [watchedDate, busyStartsAt]
+  );
+  const allBlocked = availableTimes.length === 0;
 
   function pickTime(t: string) {
     setSelectedTime(t);
@@ -136,26 +177,39 @@ export function BookingForm({ tenantSlug, program }: { tenantSlug: string; progr
         </div>
 
         <div className="space-y-2">
-          <p className="text-[10px] uppercase tracking-wider text-ink-500">Suggested times</p>
-          <div className="flex flex-wrap gap-2">
-            {SUGGESTED_TIMES.map((t) => {
-              const active = (selectedTime ?? watchedTime) === t;
-              return (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => pickTime(t)}
-                  className={`px-3 py-1.5 rounded-md text-sm font-mono border transition-all duration-[120ms] ${
-                    active
-                      ? "bg-turf-400 text-pitch-950 border-turf-400 font-semibold"
-                      : "bg-pitch-700 text-ink-300 border-line hover:border-turf-400/60 hover:text-ink-50"
-                  }`}
-                >
-                  {format(new Date(`2000-01-01T${t}:00`), "h:mm a")}
-                </button>
-              );
-            })}
-          </div>
+          <p className="text-[10px] uppercase tracking-wider text-ink-500">
+            Available times{" "}
+            <span className="text-ink-700 normal-case tracking-normal">
+              · slots already on the schedule are hidden
+            </span>
+          </p>
+          {allBlocked ? (
+            <div className="rounded-md border border-warn/30 bg-warn/5 p-3 text-sm text-ink-300">
+              No open slots on this day — try another date, or finish the form
+              with your preferred time and the coach will reach out if there&apos;s
+              wiggle room.
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {availableTimes.map((t) => {
+                const active = (selectedTime ?? watchedTime) === t;
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => pickTime(t)}
+                    className={`px-3 py-1.5 rounded-md text-sm font-mono border transition-all duration-[120ms] ${
+                      active
+                        ? "bg-turf-400 text-pitch-950 border-turf-400 font-semibold"
+                        : "bg-pitch-700 text-ink-300 border-line hover:border-turf-400/60 hover:text-ink-50"
+                    }`}
+                  >
+                    {format(new Date(`2000-01-01T${t}:00`), "h:mm a")}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       </Card>
 
