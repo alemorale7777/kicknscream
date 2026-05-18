@@ -9,6 +9,7 @@ import { ParentDashboard } from "@/components/dashboard/ParentDashboard";
 import { Sparkline, DeltaChip } from "@/components/dashboard/Sparkline";
 import { NeedsAttention, type AttentionItem } from "@/components/dashboard/NeedsAttention";
 import { NEXT_STEP_BY_TYPE } from "@/lib/nav";
+import { greetingName } from "@/lib/greeting";
 import Link from "next/link";
 import {
   GraduationCap,
@@ -140,13 +141,7 @@ async function renderOperatorDashboard(
     }),
   ]);
 
-  // Avoid yelling the user's email handle. If we don't have a proper name
-  // (no space, or all-digit suffix like the email localpart), fall back to
-  // "Coach" — a cleaner greeting than "Hello, alemorale7777".
-  const rawName = user.name?.trim();
-  const looksLikeHandle =
-    !!rawName && /^[a-z0-9_.+-]+$/.test(rawName) && /[0-9]/.test(rawName);
-  const firstName = rawName && !looksLikeHandle ? rawName.split(" ")[0] : "Coach";
+  const firstName = greetingName(user.name, "Coach");
   const outstandingCents = openInvoicesAgg._sum.amount ?? 0;
   const outstandingCount = openInvoicesAgg._count;
 

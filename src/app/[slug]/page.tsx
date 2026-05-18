@@ -61,14 +61,18 @@ export async function generateMetadata({
   if (isReservedSlug(slug)) return { title: "Not found" };
   const tenant = await db.tenant.findUnique({ where: { slug } });
   if (!tenant) return { title: "Not found" };
+  // Custom-domain tenants own their SEO — the canonical points at their
+  // domain root (https://coach.example.com) rather than the platform
+  // host. Tenants without a custom domain canonicalize at /{slug}, which
+  // resolves against the root-layout metadataBase (kicknscream.com).
+  const canonical = tenant.customDomain
+    ? `https://${tenant.customDomain}`
+    : `/${slug}`;
   return {
     title: tenant.name,
     description: `${tenant.name} on KickNScream — ${TYPE_COPY[tenant.type].tagline}`,
-    // Canonical points at /{slug}; the authenticated /t/{slug} variant
-    // is robots-blocked but Google can still discover it via internal
-    // links — the canonical tells them which version to index.
     alternates: {
-      canonical: `/${slug}`,
+      canonical,
     },
     openGraph: {
       title: tenant.name,

@@ -7,6 +7,7 @@ import { OutstandingStrip } from "@/components/family/OutstandingStrip";
 import { Card } from "@/components/ui/card";
 import { getEventWeather } from "@/lib/weather";
 import { loadUpcomingFamilyEvents } from "@/lib/family/events";
+import { greetingName } from "@/lib/greeting";
 import { Button } from "@/components/ui/button";
 import { ScrollText, ArrowRight, Users, Calendar } from "lucide-react";
 
@@ -82,7 +83,7 @@ export default async function FamilyHomePage({
     <div className="space-y-6">
       <header className="space-y-1">
         <p className="text-sm uppercase tracking-[0.2em] text-ink-500">
-          Hello, {user.name ?? "there"}
+          Hello, {greetingName(user.name, "there")}
         </p>
         <h1 className="text-3xl lg:text-4xl font-bold tracking-[-0.03em]">{tenant.name}</h1>
       </header>
