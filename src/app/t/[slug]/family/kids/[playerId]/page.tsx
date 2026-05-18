@@ -27,6 +27,15 @@ export default async function FamilyKidPage({
     notFound();
   }
 
+  const enrollments = await db.enrollment.findMany({
+    where: {
+      playerId: player.id,
+      status: { in: ["ACTIVE", "CONFIRMED", "PAID", "PENDING"] },
+    },
+    select: { programId: true },
+  });
+  const programIds = Array.from(new Set(enrollments.map((e) => e.programId)));
+
   const [attendances, sessionNotes, upcomingEvents] = await Promise.all([
     db.attendance.findMany({
       where: { playerId: player.id },
@@ -38,16 +47,18 @@ export default async function FamilyKidPage({
       orderBy: { createdAt: "desc" },
       take: 10,
     }),
-    db.event.findMany({
-      where: {
-        tenantId: tenant.id,
-        startsAt: { gte: new Date() },
-        title: { contains: `${player.firstName} ${player.lastName}` },
-      },
-      include: { location: true },
-      orderBy: { startsAt: "asc" },
-      take: 10,
-    }),
+    programIds.length > 0
+      ? db.event.findMany({
+          where: {
+            tenantId: tenant.id,
+            programId: { in: programIds },
+            startsAt: { gte: new Date() },
+          },
+          include: { location: true },
+          orderBy: { startsAt: "asc" },
+          take: 10,
+        })
+      : Promise.resolve([]),
   ]);
 
   const age = differenceInYears(new Date(), player.dob);
