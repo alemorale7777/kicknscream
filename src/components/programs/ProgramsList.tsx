@@ -27,6 +27,8 @@ import {
   GraduationCap,
   Users,
   Share2,
+  CheckCircle2,
+  CircleDashed,
 } from "lucide-react";
 import type { Program, PriceModel } from "@prisma/client";
 
@@ -230,12 +232,37 @@ function ProgramCard({
   onShare: () => void;
 }) {
   const isPending = pendingId === program.id;
+  const recurring = program.priceModel === "MONTHLY";
+  const recurringPriceConnected = recurring && !!program.stripePriceId;
   return (
     <Card className="p-5 group hover:border-turf-400/40 transition-colors">
       <div className="flex items-start gap-4">
         <div className="flex-1 min-w-0 space-y-2">
+          {/* Title row — name on the left, price column-aligned on the right
+              so a stack of cards reads as a price column instead of a wall of
+              inline labels. */}
+          <div className="flex items-baseline gap-3 justify-between">
+            <h3 className="font-semibold text-ink-50 text-lg leading-tight min-w-0 truncate">
+              {program.name}
+            </h3>
+            <div className="shrink-0 text-right">
+              {program.priceModel === "FREE" ? (
+                <span className="text-turf-300 font-semibold text-sm">Free</span>
+              ) : (
+                <span className="inline-flex items-baseline gap-1.5">
+                  <span className="font-mono text-flood-400 font-semibold text-base">
+                    {formatCents(program.price)}
+                  </span>
+                  <span className="text-xs text-ink-500">
+                    {PRICE_MODEL_LABEL[program.priceModel]}
+                  </span>
+                </span>
+              )}
+            </div>
+          </div>
+
           <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="font-semibold text-ink-50 text-lg">{program.name}</h3>
+            <StatusPill archived={program.archived} />
             {program.skillLevel && (
               <Badge variant="outline">
                 {program.skillLevel.charAt(0) + program.skillLevel.slice(1).toLowerCase()}
@@ -247,30 +274,37 @@ function ProgramCard({
                 {program.ageMax ? `–${program.ageMax}` : "+"} yrs
               </Badge>
             )}
-            {program.archived && <Badge variant="warn">archived</Badge>}
+            {recurring && (
+              <Badge
+                variant="outline"
+                className={
+                  recurringPriceConnected
+                    ? "border-turf-400/40 text-turf-300 bg-turf-400/5"
+                    : "border-warn/40 text-warn bg-warn/5"
+                }
+              >
+                {recurringPriceConnected ? (
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                ) : (
+                  <CircleDashed className="h-3 w-3 mr-1" />
+                )}
+                {recurringPriceConnected
+                  ? "Recurring price · live"
+                  : "Recurring price pending"}
+              </Badge>
+            )}
           </div>
+
           {program.description && (
             <p className="text-sm text-ink-300 leading-relaxed">{program.description}</p>
           )}
-          <div className="flex items-center gap-4 text-xs text-ink-500">
-            <span className="inline-flex items-center gap-1">
-              {program.priceModel === "FREE" ? (
-                <span className="text-turf-300 font-medium">Free</span>
-              ) : (
-                <>
-                  <span className="font-mono text-flood-400 font-medium">{formatCents(program.price)}</span>
-                  <span className="text-ink-700">·</span>
-                  <span>{PRICE_MODEL_LABEL[program.priceModel]}</span>
-                </>
-              )}
-            </span>
-            {program.capacity && (
-              <span className="inline-flex items-center gap-1">
-                <Users className="h-3 w-3" />
-                {program.capacity} cap
-              </span>
-            )}
-          </div>
+
+          {program.capacity && (
+            <div className="flex items-center gap-1 text-xs text-ink-500">
+              <Users className="h-3 w-3" />
+              {program.capacity} cap
+            </div>
+          )}
         </div>
 
         {canEdit && (
@@ -317,5 +351,22 @@ function ProgramCard({
         )}
       </div>
     </Card>
+  );
+}
+
+function StatusPill({ archived }: { archived: boolean }) {
+  if (archived) {
+    return (
+      <Badge variant="outline" className="border-line text-ink-500 bg-pitch-700">
+        <span className="h-1.5 w-1.5 rounded-full bg-ink-700 mr-1.5" />
+        Archived
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="outline" className="border-turf-400/40 text-turf-300 bg-turf-400/5">
+      <span className="h-1.5 w-1.5 rounded-full bg-turf-400 mr-1.5" />
+      Active
+    </Badge>
   );
 }
