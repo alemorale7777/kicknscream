@@ -186,6 +186,59 @@ export async function sendBroadcastEmail(opts: {
   });
 }
 
+/**
+ * 1:1 direct message email — used by the coach Messages module when sending
+ * a reply that should also go out by email (in-app delivery is unconditional;
+ * email respects UserPreferences.emailMessages).
+ */
+export async function sendDirectMessageEmail(opts: {
+  to: string;
+  recipientName?: string | null;
+  senderName: string;
+  tenantName: string;
+  tenantSlug: string;
+  subject: string;
+  bodyText: string;
+  replyUrl: string;
+}) {
+  const resend = new Resend(env.AUTH_RESEND_KEY);
+  const greetingName = opts.recipientName ? opts.recipientName.split(" ")[0] : null;
+  const bodyHtml = opts.bodyText
+    .split(/\n{2,}/)
+    .map((p) => `<p style="margin:8px 0;">${escapeHtml(p).replace(/\n/g, "<br>")}</p>`)
+    .join("");
+
+  const html = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>${escapeHtml(opts.subject)}</title></head>
+<body style="margin:0;padding:0;background:#050A07;font-family:-apple-system,system-ui,sans-serif;color:#F5F7F4;">
+  <div style="max-width:560px;margin:0 auto;padding:32px 24px;">
+    <div style="margin-bottom:24px;">
+      <span style="font-size:18px;font-weight:800;letter-spacing:-0.04em;color:#F5F7F4;">${escapeHtml(opts.tenantName)}</span>
+    </div>
+    <div style="background:#0F1C17;border:1px solid rgba(255,255,255,0.14);border-radius:12px;padding:32px;">
+      <p style="margin:0 0 8px;color:#94A39B;font-size:12px;text-transform:uppercase;letter-spacing:0.12em;">Message from ${escapeHtml(opts.senderName)}</p>
+      <h1 style="margin:0 0 16px;font-size:20px;font-weight:700;letter-spacing:-0.02em;color:#F5F7F4;">${escapeHtml(opts.subject)}</h1>
+      ${greetingName ? `<p style="margin:0 0 12px;color:#C4CDC7;">Hi ${escapeHtml(greetingName)},</p>` : ""}
+      <div style="color:#C4CDC7;font-size:15px;line-height:1.7;">${bodyHtml}</div>
+      <div style="margin:24px 0 0;border-top:1px solid rgba(255,255,255,0.14);padding-top:16px;">
+        <a href="${escapeHtml(opts.replyUrl)}" style="display:inline-block;background:#1FB663;color:#0A1410;text-decoration:none;font-weight:600;font-size:14px;padding:10px 16px;border-radius:8px;">Reply in app</a>
+      </div>
+    </div>
+    <p style="margin:20px 0 0;color:#5A6A62;font-size:11px;text-align:center;">
+      Sent via KickNScream · Reply to this email to respond directly.
+    </p>
+  </div>
+</body></html>`;
+
+  await resend.emails.send({
+    from: env.EMAIL_FROM,
+    to: opts.to,
+    subject: opts.subject,
+    html,
+    text: `${opts.senderName} (${opts.tenantName}):\n\n${opts.bodyText}\n\nReply: ${opts.replyUrl}`,
+  });
+}
+
 function renderMarkdownToInlineHtml(raw: string): string {
   const escaped = escapeHtml(raw);
   const lines = escaped.split(/\n/);

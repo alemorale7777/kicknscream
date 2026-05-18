@@ -39,6 +39,7 @@ export function navForTenantType(type: TenantType, slug = ":slug"): NavItem[] {
         { label: "Bookings", href: `${base}/bookings`, icon: ClipboardList },
         { label: "Schedule", href: `${base}/schedule`, icon: Calendar },
         { label: "Players", href: `${base}/roster`, icon: Users },
+        { label: "Messages", href: `${base}/messages`, icon: MessageSquare },
         { label: "Settings", href: `${base}/settings`, icon: Settings },
       ];
     case "INSTITUTION":
@@ -49,7 +50,7 @@ export function navForTenantType(type: TenantType, slug = ":slug"): NavItem[] {
         { label: "Roster", href: `${base}/roster`, icon: Users },
         { label: "Attendance", href: `${base}/attendance`, icon: ClipboardList },
         { label: "Payments", href: `${base}/payments`, icon: Wallet },
-        { label: "Comms", href: `${base}/comms`, icon: MessageSquare },
+        { label: "Messages", href: `${base}/messages`, icon: MessageSquare },
         { label: "Reports", href: `${base}/reports`, icon: BarChart3 },
         { label: "Settings", href: `${base}/settings`, icon: Settings },
       ];
