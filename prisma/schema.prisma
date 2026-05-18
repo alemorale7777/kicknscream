@@ -216,23 +216,28 @@ enum EventType {
 }
 
 model Event {
-  id          String        @id @default(cuid())
-  tenantId    String
-  programId   String?
-  locationId  String?
-  type        EventType
-  title       String
-  startsAt    DateTime
-  endsAt      DateTime
-  capacity    Int?
-  attendances Attendance[]
-  notes       SessionNote[]
-  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  program     Program?      @relation(fields: [programId], references: [id])
-  location    Location?     @relation(fields: [locationId], references: [id])
+  id                String        @id @default(cuid())
+  tenantId          String
+  programId         String?
+  locationId        String?
+  type              EventType
+  title             String
+  startsAt          DateTime
+  endsAt            DateTime
+  capacity          Int?
+  // Recurrence linkage — every event in the same series shares this id.
+  // Lets us scope bulk edits to "this", "this+future", or "all" without
+  // moving to a derived-RRULE model.
+  recurringSeriesId String?
+  attendances       Attendance[]
+  notes             SessionNote[]
+  tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  program           Program?      @relation(fields: [programId], references: [id])
+  location          Location?     @relation(fields: [locationId], references: [id])
 
   @@index([tenantId, startsAt])
   @@index([programId])
+  @@index([recurringSeriesId])
 }
 
 model Player {

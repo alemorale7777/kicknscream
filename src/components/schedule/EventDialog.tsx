@@ -30,6 +30,7 @@ import {
   createEventAction,
   updateEventAction,
   deleteEventAction,
+  type SeriesScope,
 } from "@/actions/event";
 import {
   loadEventAttendanceAction,
@@ -130,6 +131,9 @@ export function EventDialog({
 
   const [pending, startTransition] = useTransition();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [pendingSave, setPendingSave] = useState<FormData | null>(null);
+  const isSeries = !!(event as { recurringSeriesId?: string | null } | undefined)
+    ?.recurringSeriesId;
 
   const {
     register,
@@ -159,13 +163,23 @@ export function EventDialog({
   const locationIdValue = useWatch({ control, name: "locationId" });
 
   function onSubmit(data: FormData) {
+    // Editing a recurring occurrence — pause and ask whether to apply the
+    // change to this only, this+future, or every event in the series.
+    if (isEdit && isSeries) {
+      setPendingSave(data);
+      return;
+    }
+    runSave(data, "this");
+  }
+
+  function runSave(data: FormData, scope: SeriesScope) {
     startTransition(async () => {
       try {
         const startsAt = combineDateTime(data.date, data.startTime).toISOString();
         const endsAt = combineDateTime(data.date, data.endTime).toISOString();
 
         if (isEdit) {
-          await updateEventAction({
+          const result = await updateEventAction({
             id: event!.id,
             tenantId,
             type: data.type,
@@ -175,8 +189,11 @@ export function EventDialog({
             locationId: data.locationId || null,
             programId: null,
             capacity: data.capacity ? Number(data.capacity) : null,
+            scope,
           });
-          toast.success("Event updated");
+          toast.success(
+            result.count > 1 ? `Updated ${result.count} events` : "Event updated"
+          );
         } else {
           const result = await createEventAction({
             tenantId,
@@ -200,6 +217,7 @@ export function EventDialog({
           );
           reset();
         }
+        setPendingSave(null);
         onOpenChange(false);
       } catch (e) {
         toast.error((e as Error).message);
@@ -207,12 +225,18 @@ export function EventDialog({
     });
   }
 
-  function handleDelete() {
+  function runDelete(scope: SeriesScope) {
     if (!event) return;
     startTransition(async () => {
       try {
-        await deleteEventAction(tenantId, event.id);
-        toast.success("Event deleted");
+        const result = await deleteEventAction({
+          tenantId,
+          eventId: event.id,
+          scope,
+        });
+        toast.success(
+          result.count > 1 ? `Deleted ${result.count} events` : "Event deleted"
+        );
         onOpenChange(false);
       } catch (e) {
         toast.error((e as Error).message);
@@ -381,31 +405,62 @@ export function EventDialog({
                 <div className="text-sm">
                   <p className="font-medium text-ink-50">Delete &ldquo;{event?.title}&rdquo;?</p>
                   <p className="text-xs text-ink-500 mt-0.5">
-                    Removes it from the schedule, including attendance and any notes. This can&apos;t be undone.
+                    {isSeries
+                      ? "This event is part of a recurring series. Pick what to delete:"
+                      : "Removes it from the schedule, including attendance and any notes. This can’t be undone."}
                   </p>
                 </div>
               </div>
-              <div className="flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setConfirmingDelete(false)}
-                  disabled={pending}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={handleDelete}
-                  disabled={pending}
-                  className="bg-danger text-pitch-950 hover:bg-danger/90"
-                >
-                  {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                  Delete event
-                </Button>
+              {isSeries ? (
+                <ScopePicker
+                  pending={pending}
+                  onCancel={() => setConfirmingDelete(false)}
+                  onPick={(scope) => runDelete(scope)}
+                  variant="danger"
+                />
+              ) : (
+                <div className="flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setConfirmingDelete(false)}
+                    disabled={pending}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => runDelete("this")}
+                    disabled={pending}
+                    className="bg-danger text-pitch-950 hover:bg-danger/90"
+                  >
+                    {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                    Delete event
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {isEdit && pendingSave && (
+            <div className="mt-6 rounded-md border border-turf-400/40 bg-turf-400/5 p-4 space-y-3">
+              <div className="flex items-start gap-2">
+                <Repeat className="h-4 w-4 text-turf-300 mt-0.5 shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium text-ink-50">Apply changes to recurring event</p>
+                  <p className="text-xs text-ink-500 mt-0.5">
+                    Choose which occurrences should update.
+                  </p>
+                </div>
               </div>
+              <ScopePicker
+                pending={pending}
+                onCancel={() => setPendingSave(null)}
+                onPick={(scope) => runSave(pendingSave, scope)}
+                variant="primary"
+              />
             </div>
           )}
         </SheetBody>
@@ -619,5 +674,90 @@ function RosterPanel({
         </ul>
       )}
     </div>
+  );
+}
+
+/**
+ * Series-scope picker shown when a coach edits or deletes one occurrence of
+ * a recurring event. Three vertical buttons make it tappable on mobile and
+ * keep the impact of each scope explicit.
+ */
+function ScopePicker({
+  pending,
+  onCancel,
+  onPick,
+  variant,
+}: {
+  pending: boolean;
+  onCancel: () => void;
+  onPick: (scope: SeriesScope) => void;
+  variant: "primary" | "danger";
+}) {
+  const danger = variant === "danger";
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-1 gap-2">
+        <ScopeButton
+          onClick={() => onPick("this")}
+          disabled={pending}
+          label="Just this event"
+          hint="Other occurrences in the series stay as they are."
+          danger={danger}
+        />
+        <ScopeButton
+          onClick={() => onPick("future")}
+          disabled={pending}
+          label="This and future events"
+          hint="Past occurrences keep their original details."
+          danger={danger}
+        />
+        <ScopeButton
+          onClick={() => onPick("all")}
+          disabled={pending}
+          label="All events in the series"
+          hint="Applies to every occurrence — past and future."
+          danger={danger}
+        />
+      </div>
+      <div className="flex justify-end">
+        <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={pending}>
+          Cancel
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ScopeButton({
+  onClick,
+  disabled,
+  label,
+  hint,
+  danger,
+}: {
+  onClick: () => void;
+  disabled: boolean;
+  label: string;
+  hint: string;
+  danger: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        "w-full rounded-md border px-3 py-2 text-left text-sm transition-colors duration-[120ms]",
+        "border-line bg-pitch-800 hover:bg-pitch-700 disabled:opacity-50",
+        danger
+          ? "hover:border-danger/40 hover:bg-danger/10"
+          : "hover:border-turf-400/40 hover:bg-turf-400/10"
+      )}
+    >
+      <span className={cn("block font-medium", danger ? "text-danger" : "text-turf-300")}>
+        {label}
+      </span>
+      <span className="block text-xs text-ink-500 mt-0.5">{hint}</span>
+    </button>
   );
 }
