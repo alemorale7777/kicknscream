@@ -4,17 +4,21 @@ import { ChalkGrid } from "@/components/brand/ChalkGrid";
 import { format, formatDistanceToNowStrict } from "date-fns";
 import { Calendar, MapPin, Clock, ArrowRight, ExternalLink } from "lucide-react";
 import { IcsDownloadButton } from "./IcsDownloadButton";
+import { WeatherChip } from "./WeatherChip";
 import Link from "next/link";
 import type { Event, Location, Player } from "@prisma/client";
+import type { WeatherSummary } from "@/lib/weather";
 
 export function NextSessionHero({
   tenantSlug,
   event,
   player,
+  weather,
 }: {
   tenantSlug: string;
   event: (Event & { location: Location | null }) | null;
   player: Player;
+  weather?: WeatherSummary | null;
 }) {
   if (!event) {
     return (
@@ -66,6 +70,11 @@ export function NextSessionHero({
             </div>
           )}
         </div>
+        {weather && (
+          <div className="pt-1">
+            <WeatherChip weather={weather} />
+          </div>
+        )}
         <div className="flex flex-wrap gap-2 pt-2">
           <IcsDownloadButton
             uid={event.id}

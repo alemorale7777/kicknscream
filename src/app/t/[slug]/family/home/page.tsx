@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { NextSessionHero } from "@/components/family/NextSessionHero";
 import { KidsCarousel } from "@/components/family/KidsCarousel";
 import { OutstandingStrip } from "@/components/family/OutstandingStrip";
+import { getEventWeather } from "@/lib/weather";
 
 export const metadata = { title: "Home" };
 
@@ -47,6 +48,16 @@ export default async function FamilyHomePage({
       nextEvents.find((e) => e.title.includes(`${p.firstName} ${p.lastName}`)) ?? null,
   }));
 
+  // Forecast lookup per kid hero — parallel and gracefully nullable.
+  // Open-Meteo geocodes + caches at the framework fetch layer so the same
+  // address across many kids only hits the network once an hour.
+  const heroWeather = await Promise.all(
+    heroByKid.map(async ({ event }) => {
+      if (!event?.location?.address) return null;
+      return getEventWeather(event.location.address, event.startsAt);
+    })
+  );
+
   return (
     <div className="space-y-6">
       <header className="space-y-1">
@@ -59,12 +70,13 @@ export default async function FamilyHomePage({
       <OutstandingStrip tenantSlug={tenant.slug} invoices={invoices} />
 
       <div className="space-y-3">
-        {heroByKid.map(({ player, event }) => (
+        {heroByKid.map(({ player, event }, i) => (
           <NextSessionHero
             key={player.id}
             tenantSlug={tenant.slug}
             event={event}
             player={player}
+            weather={heroWeather[i]}
           />
         ))}
       </div>
