@@ -460,6 +460,7 @@ function SortHeader({
   const Icon = !active ? ArrowUpDown : dir === "asc" ? ArrowUp : ArrowDown;
   return (
     <th
+      aria-sort={active ? (dir === "asc" ? "ascending" : "descending") : "none"}
       className={`px-4 py-2 text-${align} text-[11px] uppercase tracking-wider font-medium ${className ?? ""}`}
     >
       <button
@@ -468,7 +469,6 @@ function SortHeader({
         className={`inline-flex items-center gap-1.5 transition-colors ${
           active ? "text-ink-50" : "text-ink-500 hover:text-ink-300"
         }`}
-        aria-sort={active ? (dir === "asc" ? "ascending" : "descending") : "none"}
       >
         {label}
         <Icon className="h-3 w-3 opacity-70" />

@@ -79,7 +79,7 @@ export async function getEventWeather(
   if (!address) return null;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const targetDay = new Date(eventDate);
+  const targetDay = new Date(eventDate.getTime());
   targetDay.setHours(0, 0, 0, 0);
   const daysOut = Math.round(
     (targetDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
