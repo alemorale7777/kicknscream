@@ -114,6 +114,66 @@ export async function updateTenantAction(input: z.infer<typeof updateTenantSchem
   }
 }
 
+const brandingSchema = z.object({
+  tenantId: z.string(),
+  bio: z.string().max(4000).optional().nullable(),
+  testimonials: z
+    .array(
+      z.object({
+        author: z.string().min(1).max(80),
+        role: z.string().max(120).optional(),
+        quote: z.string().min(1).max(1000),
+      })
+    )
+    .max(20)
+    .optional(),
+});
+
+/**
+ * Updates the public-page enrichment fields (bio + testimonials). Separate
+ * from updateTenantAction because the editor lives on /admin/branding and
+ * the schema/permissions story is meaningfully different (testimonials is
+ * a Json array, not a scalar).
+ */
+export async function updateTenantBrandingAction(
+  input: z.infer<typeof brandingSchema>
+) {
+  const data = brandingSchema.parse(input);
+  const user = await getCurrentUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const membership = user.memberships.find((m) => m.tenantId === data.tenantId);
+  if (!membership || !canManageTenant(membership.role)) {
+    throw new Error("You don't have permission to edit branding");
+  }
+
+  await db.tenant.update({
+    where: { id: data.tenantId },
+    data: {
+      bio: data.bio ?? null,
+      testimonials: data.testimonials ?? [],
+    },
+  });
+
+  if (membership.tenant) {
+    await db.auditLog.create({
+      data: {
+        tenantId: data.tenantId,
+        actorUserId: user.id,
+        action: "tenant.branding_update",
+        targetType: "Tenant",
+        diff: {
+          bioLength: data.bio?.length ?? 0,
+          testimonialCount: data.testimonials?.length ?? 0,
+        },
+      },
+    });
+    revalidatePath(`/${membership.tenant.slug}`);
+    revalidatePath(`/t/${membership.tenant.slug}/admin/branding`);
+    revalidatePath(`/t/${membership.tenant.slug}/admin/audit`);
+  }
+}
+
 const deleteTenantSchema = z.object({
   tenantId: z.string(),
   confirmation: z.string(),
