@@ -12,6 +12,7 @@ import {
   Trophy,
   Search,
   Sparkles,
+  NotebookPen,
   type LucideIcon,
 } from "lucide-react";
 
@@ -40,6 +41,7 @@ export function navForTenantType(type: TenantType, slug = ":slug"): NavItem[] {
         { label: "Schedule", href: `${base}/schedule`, icon: Calendar },
         { label: "Players", href: `${base}/roster`, icon: Users },
         { label: "Messages", href: `${base}/messages`, icon: MessageSquare },
+        { label: "Notes", href: `${base}/notes`, icon: NotebookPen },
         { label: "Reports", href: `${base}/reports`, icon: BarChart3 },
         { label: "Settings", href: `${base}/settings`, icon: Settings },
       ];
@@ -52,6 +54,7 @@ export function navForTenantType(type: TenantType, slug = ":slug"): NavItem[] {
         { label: "Attendance", href: `${base}/attendance`, icon: ClipboardList },
         { label: "Payments", href: `${base}/payments`, icon: Wallet },
         { label: "Messages", href: `${base}/messages`, icon: MessageSquare },
+        { label: "Notes", href: `${base}/notes`, icon: NotebookPen },
         { label: "Reports", href: `${base}/reports`, icon: BarChart3 },
         { label: "Settings", href: `${base}/settings`, icon: Settings },
       ];
@@ -63,6 +66,7 @@ export function navForTenantType(type: TenantType, slug = ":slug"): NavItem[] {
         { label: "Roster", href: `${base}/roster`, icon: Users },
         { label: "Tryouts", href: `${base}/tryouts`, icon: Search },
         { label: "Development", href: `${base}/development`, icon: Sparkles },
+        { label: "Notes", href: `${base}/notes`, icon: NotebookPen },
         { label: "Reports", href: `${base}/reports`, icon: BarChart3 },
         { label: "Settings", href: `${base}/settings`, icon: Settings },
       ];

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { navForTenantType, NEXT_STEP_BY_TYPE } from "@/lib/nav";
 
 describe("navForTenantType", () => {
-  it("returns coach nav with 8 items in order", () => {
+  it("returns coach nav with 9 items in order", () => {
     const items = navForTenantType("COACH");
     expect(items.map((i) => i.label)).toEqual([
       "Dashboard",
@@ -11,6 +11,7 @@ describe("navForTenantType", () => {
       "Schedule",
       "Players",
       "Messages",
+      "Notes",
       "Reports",
       "Settings",
     ]);
@@ -26,22 +27,24 @@ describe("navForTenantType", () => {
     expect(items.find((i) => i.label === "Services")?.href).toBe("/t/alej/coach/programs");
   });
 
-  it("returns institution nav with 9 items", () => {
+  it("returns institution nav with 10 items", () => {
     const items = navForTenantType("INSTITUTION");
-    expect(items).toHaveLength(9);
+    expect(items).toHaveLength(10);
     expect(items[0].label).toBe("Dashboard");
     expect(items.at(-1)?.label).toBe("Settings");
     expect(items.map((i) => i.label)).toContain("Programs");
     expect(items.map((i) => i.label)).toContain("Payments");
     expect(items.map((i) => i.label)).toContain("Messages");
+    expect(items.map((i) => i.label)).toContain("Notes");
   });
 
-  it("returns club nav with 8 items including Tryouts + Development", () => {
+  it("returns club nav with 9 items including Tryouts + Development", () => {
     const items = navForTenantType("CLUB");
-    expect(items).toHaveLength(8);
+    expect(items).toHaveLength(9);
     expect(items.map((i) => i.label)).toContain("Tryouts");
     expect(items.map((i) => i.label)).toContain("Development");
     expect(items.map((i) => i.label)).toContain("Teams");
+    expect(items.map((i) => i.label)).toContain("Notes");
   });
 
   it("uses the provided slug in hrefs", () => {
