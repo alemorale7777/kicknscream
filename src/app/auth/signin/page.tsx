@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { signIn } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -6,6 +7,11 @@ import { Label } from "@/components/ui/label";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { ChalkGrid, Floodlight } from "@/components/brand/ChalkGrid";
 import { Mail } from "lucide-react";
+import { getCurrentUser } from "@/lib/tenant";
+import {
+  defaultPortalForRole,
+  portalDefaultPath,
+} from "@/lib/auth/portal";
 
 export const metadata = { title: "Sign in" };
 
@@ -16,6 +22,24 @@ export default async function SignInPage({
 }) {
   const sp = await searchParams;
   const callbackUrl = sp.callbackUrl ?? "/onboarding";
+
+  // If the user is already signed in, send them straight to their
+  // workspace instead of re-rendering the sign-in form. Honors the
+  // callbackUrl when present so post-magic-link flows still land
+  // where they intended.
+  const user = await getCurrentUser();
+  if (user) {
+    if (sp.callbackUrl) {
+      redirect(sp.callbackUrl);
+    }
+    const first = user.memberships[0];
+    if (first) {
+      redirect(
+        portalDefaultPath(first.tenant.slug, defaultPortalForRole(first.role))
+      );
+    }
+    redirect("/onboarding");
+  }
 
   return (
     <main className="relative min-h-screen flex items-center justify-center p-6 bg-pitch-900 overflow-hidden">
