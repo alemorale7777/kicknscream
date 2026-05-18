@@ -104,6 +104,91 @@ export async function loadEventAttendanceAction(tenantId: string, eventId: strin
   );
 }
 
+const seriesSchema = z.object({
+  tenantId: z.string(),
+  eventId: z.string(),
+  status: z.enum(STATUSES),
+  // Same scope semantics as the schedule editor — only "future" and "all"
+  // make sense for bulk-marking. "future" includes the targeted event.
+  scope: z.enum(["future", "all"]),
+});
+
+/**
+ * Mark attendance across an entire recurring series in one shot. Walks the
+ * series — scoped to "future" (this + every later occurrence) or "all"
+ * (every occurrence past or future) — pulls each event's enrolled players,
+ * and writes attendance rows for each (event × player) pair.
+ *
+ * Skips events that already have any attendance written — we never
+ * stomp manual marks. The intended use is "we just decided every Tuesday
+ * practice in the series is canceled / excused", not "redo all attendance".
+ */
+export async function markSeriesAttendanceAction(
+  input: z.infer<typeof seriesSchema>
+) {
+  const data = seriesSchema.parse(input);
+  const { user, membership } = await assertCanMark(data.tenantId);
+  const status = data.status as AttendanceStatus;
+  const at = status === "PRESENT" || status === "LATE" ? new Date() : null;
+
+  const target = await db.event.findUnique({ where: { id: data.eventId } });
+  if (!target || target.tenantId !== data.tenantId) {
+    throw new Error("Event not found");
+  }
+  if (!target.recurringSeriesId) {
+    throw new Error("This event isn't part of a recurring series");
+  }
+
+  const seriesEvents = await db.event.findMany({
+    where: {
+      tenantId: data.tenantId,
+      recurringSeriesId: target.recurringSeriesId,
+      ...(data.scope === "future" ? { startsAt: { gte: target.startsAt } } : {}),
+    },
+    include: {
+      attendances: { select: { id: true } },
+      program: {
+        include: {
+          enrollments: {
+            where: { status: { in: ["ACTIVE", "CONFIRMED", "PAID"] } },
+            select: { playerId: true },
+          },
+        },
+      },
+    },
+  });
+
+  let eventsWritten = 0;
+  let rowsWritten = 0;
+  for (const event of seriesEvents) {
+    if (event.attendances.length > 0) continue; // never stomp manual marks
+    if (!event.program) continue;
+    const playerIds = event.program.enrollments.map((e) => e.playerId);
+    if (playerIds.length === 0) continue;
+    await db.$transaction(
+      playerIds.map((playerId) =>
+        db.attendance.create({
+          data: {
+            eventId: event.id,
+            playerId,
+            status,
+            checkedInAt: at,
+            checkedInBy: user.id,
+          },
+        })
+      )
+    );
+    eventsWritten++;
+    rowsWritten += playerIds.length;
+  }
+
+  if (membership.tenant) {
+    revalidatePath(`/t/${membership.tenant.slug}/coach/schedule`);
+    revalidatePath(`/t/${membership.tenant.slug}/coach/schedule/${data.eventId}`);
+  }
+  return { eventsWritten, rowsWritten, eventsScanned: seriesEvents.length };
+}
+
 export async function bulkMarkAttendanceAction(input: z.infer<typeof bulkSchema>) {
   const data = bulkSchema.parse(input);
   const { user, membership } = await assertCanMark(data.tenantId);

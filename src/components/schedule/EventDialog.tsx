@@ -36,6 +36,7 @@ import {
   loadEventAttendanceAction,
   markAttendanceAction,
   bulkMarkAttendanceAction,
+  markSeriesAttendanceAction,
 } from "@/actions/attendance";
 import { ALL_EVENT_TYPES, EVENT_TONE } from "@/lib/eventTone";
 import { cn, getInitials } from "@/lib/utils";
@@ -408,6 +409,9 @@ export function EventDialog({
           {isEdit && event && (
             <div className="mt-6 pt-6 border-t border-line">
               <RosterPanel tenantId={tenantId} eventId={event.id} open={open} />
+              {isSeries && (
+                <SeriesBulkPanel tenantId={tenantId} eventId={event.id} />
+              )}
               {tenantSlug && (
                 <Link
                   href={`/t/${tenantSlug}/coach/schedule/${event.id}`}
@@ -758,6 +762,142 @@ function ScopePicker({
           Cancel
         </Button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Bulk-apply attendance across an entire recurring series. Shown only on
+ * events that have a recurringSeriesId. Pick a status (Present, Excused,
+ * Absent), pick a scope (this + future, or all), and the server walks the
+ * series filling in any event that hasn't had attendance marked yet. Never
+ * stomps existing rows.
+ */
+function SeriesBulkPanel({
+  tenantId,
+  eventId,
+}: {
+  tenantId: string;
+  eventId: string;
+}) {
+  const [status, setStatus] = useState<AttendanceStatus>("EXCUSED");
+  const [scope, setScope] = useState<"future" | "all">("future");
+  const [pending, startTransition] = useTransition();
+  const [confirming, setConfirming] = useState(false);
+
+  function run() {
+    startTransition(async () => {
+      try {
+        const result = await markSeriesAttendanceAction({
+          tenantId,
+          eventId,
+          status,
+          scope,
+        });
+        toast.success(
+          result.eventsWritten > 0
+            ? `Marked ${result.rowsWritten} ${
+                result.rowsWritten === 1 ? "player" : "players"
+              } across ${result.eventsWritten} ${
+                result.eventsWritten === 1 ? "event" : "events"
+              }`
+            : `No events to update — ${result.eventsScanned} ${
+                result.eventsScanned === 1 ? "event" : "events"
+              } already had attendance`
+        );
+        setConfirming(false);
+      } catch (e) {
+        toast.error((e as Error).message);
+      }
+    });
+  }
+
+  return (
+    <div className="mt-6 pt-6 border-t border-line space-y-3">
+      <div>
+        <p className="text-xs uppercase tracking-[0.2em] text-ink-500 inline-flex items-center gap-1.5">
+          <Repeat className="h-3 w-3" />
+          Series-wide attendance
+        </p>
+        <p className="text-xs text-ink-500 mt-1">
+          Apply a status to every event in this series at once. Events that
+          already have attendance marked are skipped — we never stomp manual
+          marks.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label>Status</Label>
+          <Select value={status} onValueChange={(v) => setStatus(v as AttendanceStatus)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="EXCUSED">Excused (e.g. canceled)</SelectItem>
+              <SelectItem value="PRESENT">Present</SelectItem>
+              <SelectItem value="ABSENT">Absent</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label>Scope</Label>
+          <Select value={scope} onValueChange={(v) => setScope(v as "future" | "all")}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="future">This and future events</SelectItem>
+              <SelectItem value="all">Every event in the series</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {!confirming ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setConfirming(true)}
+          disabled={pending}
+          className="w-full"
+        >
+          Apply across series
+        </Button>
+      ) : (
+        <div className="rounded-md border border-warn/30 bg-warn/5 p-3 space-y-2">
+          <p className="text-xs text-ink-300">
+            Mark every enrolled player <strong>{STATUS_CONFIG[status].label}</strong>{" "}
+            on{" "}
+            {scope === "future"
+              ? "this and every future occurrence"
+              : "every occurrence past and future"}
+            ? Events that already have attendance written are skipped.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setConfirming(false)}
+              disabled={pending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="primary"
+              onClick={run}
+              disabled={pending}
+            >
+              {pending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              Confirm
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
