@@ -174,6 +174,77 @@ export async function updateTenantBrandingAction(
   }
 }
 
+const domainRegex = /^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/;
+
+const domainSchema = z.object({
+  tenantId: z.string(),
+  customDomain: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .max(253)
+    .regex(domainRegex, "Enter a valid domain like coach.example.com")
+    .optional()
+    .or(z.literal("")),
+});
+
+/**
+ * Set / clear the tenant's custom domain. Uniqueness is enforced here at
+ * the application layer (we don't ship a unique index in the same migration
+ * because production rows would block it).
+ *
+ * This action only updates the database row — DNS verification + cert
+ * issuance happens out-of-band by adding the domain to the Vercel project.
+ * The settings page surfaces the manual steps until we wire the Vercel
+ * Domains API.
+ */
+export async function updateTenantDomainAction(
+  input: z.infer<typeof domainSchema>
+) {
+  const data = domainSchema.parse(input);
+  const user = await getCurrentUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const membership = user.memberships.find((m) => m.tenantId === data.tenantId);
+  if (!membership || !canManageTenant(membership.role)) {
+    throw new Error("You don't have permission to edit the custom domain");
+  }
+
+  const next = data.customDomain ? data.customDomain : null;
+
+  if (next) {
+    const taken = await db.tenant.findFirst({
+      where: { customDomain: next, id: { not: data.tenantId } },
+      select: { id: true },
+    });
+    if (taken) {
+      throw new Error(
+        `"${next}" is already in use by another tenant. Pick a different domain.`
+      );
+    }
+  }
+
+  await db.tenant.update({
+    where: { id: data.tenantId },
+    data: { customDomain: next },
+  });
+
+  if (membership.tenant) {
+    await db.auditLog.create({
+      data: {
+        tenantId: data.tenantId,
+        actorUserId: user.id,
+        action: next ? "tenant.domain_set" : "tenant.domain_clear",
+        targetType: "Tenant",
+        diff: { customDomain: next },
+      },
+    });
+    revalidatePath(`/t/${membership.tenant.slug}/admin/branding`);
+    revalidatePath(`/t/${membership.tenant.slug}/admin/audit`);
+  }
+  return { customDomain: next };
+}
+
 const deleteTenantSchema = z.object({
   tenantId: z.string(),
   confirmation: z.string(),

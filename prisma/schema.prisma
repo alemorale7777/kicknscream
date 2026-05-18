@@ -92,6 +92,12 @@ model Tenant {
   // testimonials as { author, role, quote } objects. Surfaced on /{slug}.
   bio                     String?
   testimonials            Json?
+  // Optional custom apex / subdomain. When set, the public page is reachable
+  // at https://{customDomain} in addition to /{slug} on the platform host.
+  // DNS verification + cert issuance is handled by Vercel Domains.
+  // Uniqueness is enforced at the application layer (server action checks
+  // findFirst before write) to keep this migration purely additive.
+  customDomain            String?
   // KYC mirror columns kept fresh by the account.updated webhook
   stripeChargesEnabled    Boolean               @default(false)
   stripePayoutsEnabled    Boolean               @default(false)

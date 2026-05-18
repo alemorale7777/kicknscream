@@ -2,6 +2,7 @@ import { requireTenant } from "@/lib/tenant";
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/chrome/PageHeader";
 import { BrandingEditor } from "@/components/admin/BrandingEditor";
+import { CustomDomainCard } from "@/components/admin/CustomDomainCard";
 import { Card } from "@/components/ui/card";
 import { canManageTenant } from "@/lib/roles";
 import Link from "next/link";
@@ -66,6 +67,11 @@ export default async function AdminBrandingPage({
           initialTestimonials={parseTestimonials(tenant.testimonials)}
         />
       </Card>
+
+      <CustomDomainCard
+        tenantId={tenant.id}
+        initialDomain={tenant.customDomain ?? null}
+      />
     </div>
   );
 }
