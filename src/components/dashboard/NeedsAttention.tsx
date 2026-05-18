@@ -30,7 +30,10 @@ export function NeedsAttention({ items }: { items: AttentionItem[] }) {
   return (
     <section className="space-y-3">
       <div className="flex items-baseline justify-between">
-        <h2 className="text-sm uppercase tracking-[0.2em] text-ink-500">Needs attention</h2>
+        <h2 className="text-[11px] font-medium uppercase tracking-wider text-warn inline-flex items-center gap-2">
+          <span className="h-1.5 w-1.5 rounded-full bg-warn" aria-hidden />
+          Needs attention
+        </h2>
         <span className="text-xs text-ink-500 font-mono">
           {items.length} {items.length === 1 ? "item" : "items"}
         </span>
@@ -43,7 +46,7 @@ export function NeedsAttention({ items }: { items: AttentionItem[] }) {
             <Link key={item.id} href={item.href} className="block group">
               <Card
                 className={cn(
-                  "transition-all duration-[120ms] hover:border-flood-400/40",
+                  "transition-all duration-[150ms] ease-out hover:border-warn/60",
                   tone.border
                 )}
               >
@@ -61,7 +64,7 @@ export function NeedsAttention({ items }: { items: AttentionItem[] }) {
                     <p className="font-semibold text-ink-50 truncate">{item.title}</p>
                     <p className="text-xs text-ink-500 truncate">{item.detail}</p>
                   </div>
-                  <div className="shrink-0 flex items-center gap-1 text-xs font-medium text-ink-300 group-hover:text-turf-300 transition-colors duration-[120ms]">
+                  <div className="shrink-0 flex items-center gap-1 text-xs font-medium text-ink-300 group-hover:text-warn group-hover:translate-x-0.5 transition-all duration-[150ms] ease-out">
                     {item.cta}
                     <ArrowRight className="h-3 w-3" />
                   </div>

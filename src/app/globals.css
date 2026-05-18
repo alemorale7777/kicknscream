@@ -200,3 +200,27 @@
   [data-sheet-overlay][data-state],
   [data-sheet-content][data-state] { animation-duration: 0ms; }
 }
+
+/* Dialog (centered modal) — fade + subtle scale. Radix already wires the
+   data-[state] attributes on overlay and content; these keyframes are the
+   actual motion. 150ms ease-out matches the rest of the dark theme. */
+@keyframes dialog-overlay-in   { from { opacity: 0; } to { opacity: 1; } }
+@keyframes dialog-overlay-out  { from { opacity: 1; } to { opacity: 0; } }
+@keyframes dialog-content-in   {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes dialog-content-out  {
+  from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  to   { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
+}
+
+[data-radix-dialog-overlay][data-state="open"]  { animation: dialog-overlay-in  150ms var(--ease-snap) both; }
+[data-radix-dialog-overlay][data-state="closed"] { animation: dialog-overlay-out 120ms var(--ease-snap) both; }
+[data-radix-dialog-content][data-state="open"]   { animation: dialog-content-in    180ms var(--ease-snap) both; }
+[data-radix-dialog-content][data-state="closed"] { animation: dialog-content-out   140ms var(--ease-snap) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-radix-dialog-overlay][data-state],
+  [data-radix-dialog-content][data-state] { animation-duration: 0ms; }
+}
