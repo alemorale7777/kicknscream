@@ -3,8 +3,24 @@ import { Button } from "@/components/ui/button";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { ChalkGrid, Floodlight } from "@/components/brand/ChalkGrid";
 import { ArrowRight } from "lucide-react";
+import { getCurrentUser } from "@/lib/tenant";
+import {
+  defaultPortalForRole,
+  portalDefaultPath,
+} from "@/lib/auth/portal";
 
-export default function HomePage() {
+export default async function HomePage() {
+  // Show a "Go to your dashboard" link for signed-in visitors instead of
+  // the sign-in/get-started pair. Routes to the right portal per role.
+  const user = await getCurrentUser();
+  const firstMembership = user?.memberships?.[0];
+  const dashboardHref = firstMembership
+    ? portalDefaultPath(
+        firstMembership.tenant.slug,
+        defaultPortalForRole(firstMembership.role)
+      )
+    : null;
+
   return (
     <main className="relative min-h-screen overflow-hidden bg-pitch-900">
       <ChalkGrid />
@@ -13,12 +29,23 @@ export default function HomePage() {
       <header className="relative z-10 flex items-center justify-between p-6 lg:px-12">
         <Wordmark size="md" />
         <div className="flex items-center gap-2">
-          <Button variant="ghost" asChild>
-            <Link href="/auth/signin">Sign in</Link>
-          </Button>
-          <Button variant="primary" asChild>
-            <Link href="/auth/signin">Get started</Link>
-          </Button>
+          {dashboardHref ? (
+            <Button variant="primary" asChild>
+              <Link href={dashboardHref} className="inline-flex items-center gap-1.5">
+                Open dashboard
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </Button>
+          ) : (
+            <>
+              <Button variant="ghost" asChild>
+                <Link href="/auth/signin">Sign in</Link>
+              </Button>
+              <Button variant="primary" asChild>
+                <Link href="/auth/signin">Get started</Link>
+              </Button>
+            </>
+          )}
         </div>
       </header>
 
