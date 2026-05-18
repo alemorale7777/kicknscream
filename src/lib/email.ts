@@ -187,6 +187,71 @@ export async function sendBroadcastEmail(opts: {
 }
 
 /**
+ * Booking reminder email — fired by the hourly cron when an event is 24h or
+ * 2h away. `lead` controls the copy ("Tomorrow" vs "In 2 hours") so the same
+ * helper handles both windows.
+ */
+export async function sendBookingReminderEmail(opts: {
+  to: string;
+  parentName?: string | null;
+  tenantName: string;
+  tenantSlug: string;
+  programName: string;
+  startsAt: Date;
+  endsAt: Date;
+  locationName?: string | null;
+  lead: "24h" | "2h";
+}) {
+  const resend = new Resend(env.AUTH_RESEND_KEY);
+  const greetingName = opts.parentName ? opts.parentName.split(" ")[0] : null;
+  const leadCopy = opts.lead === "24h" ? "Tomorrow" : "In 2 hours";
+  const dateLine = format(opts.startsAt, "EEEE, MMMM d");
+  const timeLine = `${format(opts.startsAt, "h:mm a")} – ${format(opts.endsAt, "h:mm a")}`;
+
+  const html = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Reminder: ${escapeHtml(opts.programName)}</title></head>
+<body style="margin:0;padding:0;background:#050A07;font-family:-apple-system,system-ui,sans-serif;color:#F5F7F4;">
+  <div style="max-width:560px;margin:0 auto;padding:32px 24px;">
+    <div style="margin-bottom:24px;">
+      <span style="font-size:18px;font-weight:800;letter-spacing:-0.04em;color:#F5F7F4;">${escapeHtml(opts.tenantName)}</span>
+    </div>
+    <div style="background:#0F1C17;border:1px solid rgba(255,255,255,0.14);border-radius:12px;padding:32px;">
+      <p style="margin:0 0 8px;color:#94A39B;font-size:12px;text-transform:uppercase;letter-spacing:0.12em;">${leadCopy} · reminder</p>
+      <h1 style="margin:0 0 16px;font-size:22px;font-weight:700;letter-spacing:-0.02em;color:#F5F7F4;">${escapeHtml(opts.programName)}</h1>
+      ${greetingName ? `<p style="margin:0 0 12px;color:#C4CDC7;">Hi ${escapeHtml(greetingName)},</p>` : ""}
+      <p style="margin:0 0 16px;color:#C4CDC7;line-height:1.6;">
+        Quick reminder — your session with <strong style="color:#F5F7F4;">${escapeHtml(opts.tenantName)}</strong> is ${leadCopy.toLowerCase()}.
+      </p>
+      <div style="border-top:1px solid rgba(255,255,255,0.14);border-bottom:1px solid rgba(255,255,255,0.14);padding:14px 0;margin:16px 0;">
+        <table style="width:100%;font-size:14px;color:#F5F7F4;">
+          <tr><td style="padding:4px 0;color:#94A39B;width:90px;">When</td><td style="padding:4px 0;font-weight:600;">${escapeHtml(dateLine)}<br><span style="color:#C4CDC7;font-weight:400;">${escapeHtml(timeLine)}</span></td></tr>
+          ${opts.locationName ? `<tr><td style="padding:4px 0;color:#94A39B;">Where</td><td style="padding:4px 0;">${escapeHtml(opts.locationName)}</td></tr>` : ""}
+        </table>
+      </div>
+      <p style="margin:16px 0 0;color:#94A39B;font-size:12px;line-height:1.6;">
+        Need to reschedule? Reply to this email and ${escapeHtml(opts.tenantName)} will help.
+      </p>
+    </div>
+    <p style="margin:20px 0 0;color:#5A6A62;font-size:12px;text-align:center;">
+      Powered by KickNScream · Manage notification preferences in your portal.
+    </p>
+  </div>
+</body></html>`;
+
+  const text = `Reminder: ${opts.programName}\n${leadCopy} · ${dateLine}\n${timeLine}${
+    opts.locationName ? `\nLocation: ${opts.locationName}` : ""
+  }\n\nReply to this email if you need to reschedule.`;
+
+  await resend.emails.send({
+    from: env.EMAIL_FROM,
+    to: opts.to,
+    subject: `${leadCopy} · ${opts.programName} reminder`,
+    html,
+    text,
+  });
+}
+
+/**
  * 1:1 direct message email — used by the coach Messages module when sending
  * a reply that should also go out by email (in-app delivery is unconditional;
  * email respects UserPreferences.emailMessages).
