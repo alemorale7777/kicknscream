@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { TopNav } from "@/components/chrome/TopNav";
 import { AdminSideNav } from "@/components/chrome/AdminSideNav";
+import { Identify } from "@/components/analytics/Identify";
 import type { Tenant, User, Role } from "@prisma/client";
 
 export async function AdminShell({
@@ -16,6 +17,7 @@ export async function AdminShell({
 }) {
   return (
     <div className="min-h-screen bg-pitch-900 text-ink-50">
+      <Identify userId={user.id} email={user.email} name={user.name} />
       <TopNav tenant={tenant} user={user} currentRole={role} />
       <div className="flex">
         <AdminSideNav tenant={tenant} />
