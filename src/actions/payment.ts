@@ -3,8 +3,10 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
+import { env } from "@/lib/env";
 import { getCurrentUser } from "@/lib/tenant";
 import { canManageTenant } from "@/lib/roles";
+import { getStripe, stripeEnabled } from "@/lib/stripe";
 import type { PaymentMethod } from "@prisma/client";
 
 const PAYMENT_METHODS = ["CARD", "CASH", "CHECK", "VENMO", "ZELLE", "PAYPAL", "ACH", "OTHER"] as const;
@@ -88,6 +90,97 @@ export async function voidInvoiceAction(input: z.infer<typeof voidSchema>) {
   if (!membership.tenant) throw new Error("Tenant not found");
   await db.invoice.update({ where: { id: data.invoiceId }, data: { status: "VOIDED" } });
   revalidatePath(`/t/${membership.tenant.slug}/coach/payments`);
+}
+
+const parentPaySchema = z.object({ invoiceId: z.string() });
+
+/**
+ * Parent-initiated Stripe checkout for an outstanding invoice. Auths the
+ * caller as the invoice's payer (matched by session email — the same
+ * surface that's used to scope /family/pay), checks Stripe is configured
+ * for the tenant, and returns a hosted-checkout URL the client redirects
+ * to. The standard /api/webhooks/stripe handler closes the loop on
+ * checkout.session.completed.
+ *
+ * Idempotency note: each click creates a new Stripe Checkout Session,
+ * which is fine — Stripe expires unused sessions automatically and the
+ * webhook is idempotent on session.id via StripeWebhookEvent.
+ */
+export async function createParentInvoiceCheckoutAction(
+  input: z.infer<typeof parentPaySchema>
+): Promise<{ url: string }> {
+  const data = parentPaySchema.parse(input);
+  const user = await getCurrentUser();
+  if (!user) throw new Error("Not authenticated");
+  if (!user.email) throw new Error("Missing email on account");
+
+  const invoice = await db.invoice.findUnique({
+    where: { id: data.invoiceId },
+    include: { tenant: true, payments: true },
+  });
+  if (!invoice) throw new Error("Invoice not found");
+  if (invoice.payerEmail.toLowerCase() !== user.email.toLowerCase()) {
+    throw new Error("This invoice isn't on your account");
+  }
+  if (invoice.status === "PAID") throw new Error("This invoice is already paid");
+  if (invoice.status === "VOIDED") throw new Error("This invoice has been voided");
+
+  const paidSoFar = invoice.payments.reduce((acc, p) => acc + p.amount, 0);
+  const remainingCents = invoice.amount - paidSoFar;
+  if (remainingCents <= 0) throw new Error("Nothing left to pay on this invoice");
+
+  if (!stripeEnabled()) {
+    throw new Error(
+      "Online payment isn't configured yet — reach out to the coach to settle."
+    );
+  }
+  if (!invoice.tenant.stripeAccountId) {
+    throw new Error(
+      "This club hasn't connected Stripe — payment must be handled manually."
+    );
+  }
+
+  const stripe = getStripe();
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
+    customer_email: invoice.payerEmail,
+    line_items: [
+      {
+        price_data: {
+          currency: invoice.currency || "usd",
+          product_data: {
+            name: invoice.description ?? `Invoice from ${invoice.tenant.name}`,
+          },
+          unit_amount: remainingCents,
+        },
+        quantity: 1,
+      },
+    ],
+    payment_intent_data: {
+      application_fee_amount: 0,
+      transfer_data: { destination: invoice.tenant.stripeAccountId },
+      on_behalf_of: invoice.tenant.stripeAccountId,
+      metadata: {
+        tenantId: invoice.tenantId,
+        invoiceId: invoice.id,
+      },
+    },
+    metadata: {
+      tenantId: invoice.tenantId,
+      invoiceId: invoice.id,
+    },
+    success_url: `${env.NEXTAUTH_URL}/t/${invoice.tenant.slug}/family/pay?invoice=${invoice.id}&paid=1`,
+    cancel_url: `${env.NEXTAUTH_URL}/t/${invoice.tenant.slug}/family/pay?invoice=${invoice.id}&canceled=1`,
+  });
+
+  if (!session.url) throw new Error("Stripe didn't return a checkout URL");
+
+  await db.invoice.update({
+    where: { id: invoice.id },
+    data: { stripePaymentIntentId: session.payment_intent as string | null },
+  });
+
+  return { url: session.url };
 }
 
 const reminderSchema = z.object({ tenantId: z.string(), invoiceId: z.string() });
