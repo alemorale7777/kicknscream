@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Building2, MapPin, Users, AlertTriangle, Wallet } from "lucide-react";
+import { Building2, MapPin, Users, AlertTriangle, Wallet, Bell } from "lucide-react";
 import type { Tenant } from "@prisma/client";
 
 export function SettingsNav({ tenant, isOwner }: { tenant: Tenant; isOwner: boolean }) {
@@ -15,6 +15,7 @@ export function SettingsNav({ tenant, isOwner }: { tenant: Tenant; isOwner: bool
     ...(tenant.type !== "COACH" ? [{ href: `${base}/locations`, label: "Locations", icon: MapPin }] : []),
     { href: `${base}/billing`, label: "Billing", icon: Wallet },
     { href: `${base}/team`, label: "Team", icon: Users },
+    { href: `${base}/notifications`, label: "Notifications", icon: Bell },
     ...(isOwner ? [{ href: `${base}/danger`, label: "Danger zone", icon: AlertTriangle, danger: true }] : []),
   ];
 
