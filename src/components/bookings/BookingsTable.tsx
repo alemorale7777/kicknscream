@@ -20,9 +20,6 @@ import { format, isPast } from "date-fns";
 import {
   ClipboardList,
   ArrowUpDown,
-  CheckCircle2,
-  Clock,
-  AlertTriangle,
   Search,
   X,
   Calendar as CalendarIcon,
