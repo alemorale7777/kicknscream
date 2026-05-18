@@ -15,6 +15,9 @@ export const metadata = { title: "Audit log" };
 const ACTION_LABELS: Record<string, string> = {
   "roster.bulk_import": "Bulk roster import",
   "tenant.update": "Tenant settings updated",
+  "tenant.branding_update": "Branding updated",
+  "tenant.domain_set": "Custom domain set",
+  "tenant.domain_clear": "Custom domain cleared",
   "stripe.connect": "Stripe account connected",
   "stripe.account.updated": "Stripe account refreshed",
   "permission.override": "Permission changed",
