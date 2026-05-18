@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input, Textarea } from "@/components/ui/input";
@@ -63,12 +64,27 @@ export function MessagesClient({
   threads: ThreadSummary[];
   parents: Parent[];
 }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [threads, setThreads] = useState(initialThreads);
   const [selectedId, setSelectedId] = useState<string | null>(
     initialThreads[0]?.id ?? null
   );
   const [composeOpen, setComposeOpen] = useState(false);
   const [filter, setFilter] = useState("");
+
+  // FAB + ⌘K route here with ?new=broadcast — auto-open the compose sheet.
+  // Microtask defer keeps React Compiler happy (no sync setState in effect).
+  useEffect(() => {
+    if (searchParams.get("new") !== "broadcast") return;
+    Promise.resolve().then(() => {
+      setComposeOpen(true);
+      const url = new URL(window.location.href);
+      url.searchParams.delete("new");
+      router.replace(url.pathname + (url.search || ""));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
