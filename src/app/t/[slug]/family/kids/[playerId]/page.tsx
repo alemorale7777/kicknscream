@@ -1,5 +1,6 @@
-import { requireTenant } from "@/lib/tenant";
+import { requireFamilyAccess } from "@/lib/tenant";
 import { db } from "@/lib/db";
+import { parentModelV2Enabled } from "@/lib/env";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,18 +20,21 @@ export default async function FamilyKidPage({
   params: Promise<{ slug: string; playerId: string }>;
 }) {
   const { slug, playerId } = await params;
-  const { tenant, user } = await requireTenant(slug);
+  const { tenant, user, parent } = await requireFamilyAccess(slug);
 
   const player = await db.player.findUnique({
     where: { id: playerId },
     include: { parentLinks: { select: { parentUserId: true } } },
   });
-  // 404 unless this kid is linked to the current user — either via the
-  // legacy parentId pointer or the ParentPlayer junction.
+  // 404 unless this kid is linked to the current user. Under parent-model-v2
+  // we key off Player.parentRefId === parent.id; otherwise fall back to the
+  // legacy parentId pointer + ParentPlayer junction.
   const linked =
     !!player &&
-    (player.parentId === user.id ||
-      player.parentLinks.some((l) => l.parentUserId === user.id));
+    (parentModelV2Enabled() && parent
+      ? player.parentRefId === parent.id
+      : player.parentId === user.id ||
+        player.parentLinks.some((l) => l.parentUserId === user.id));
   if (!player || player.tenantId !== tenant.id || !linked) {
     notFound();
   }

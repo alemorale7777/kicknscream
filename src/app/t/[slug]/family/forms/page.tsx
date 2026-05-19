@@ -1,5 +1,6 @@
-import { requireTenant } from "@/lib/tenant";
+import { requireFamilyAccess } from "@/lib/tenant";
 import { db } from "@/lib/db";
+import { parentModelV2Enabled } from "@/lib/env";
 import { PageHeader } from "@/components/chrome/PageHeader";
 import { Card } from "@/components/ui/card";
 import { WaiverList } from "@/components/family/WaiverList";
@@ -13,7 +14,18 @@ export default async function FamilyFormsPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const { tenant, user } = await requireTenant(slug);
+  const { tenant, user, parent } = await requireFamilyAccess(slug);
+
+  const playerWhere =
+    parentModelV2Enabled() && parent
+      ? { tenantId: tenant.id, parentRefId: parent.id }
+      : {
+          tenantId: tenant.id,
+          OR: [
+            { parentId: user.id },
+            { parentLinks: { some: { parentUserId: user.id } } },
+          ],
+        };
 
   // Pull every waiver this tenant has + every signature this parent has
   // already submitted across their players. Then split into "needs
@@ -24,13 +36,7 @@ export default async function FamilyFormsPage({
       orderBy: { title: "asc" },
     }),
     db.player.findMany({
-      where: {
-        tenantId: tenant.id,
-        OR: [
-          { parentId: user.id },
-          { parentLinks: { some: { parentUserId: user.id } } },
-        ],
-      },
+      where: playerWhere,
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     }),
   ]);

@@ -2,6 +2,7 @@ import { cache } from "react";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { parentModelV2Enabled } from "@/lib/env";
 import type { Membership, Parent, Tenant, TenantParent, User } from "@prisma/client";
 
 export { hasRole, canManageTenant, roleLabel } from "./roles";
@@ -102,5 +103,41 @@ export async function requireParentAccess(slug: string): Promise<TenantAccessPar
     redirect(`/t/${slug}/forbidden`);
   }
   return { kind: "parent", tenant, user, parent, tenantParent };
+}
+
+/**
+ * Family-portal access shape used during the parent-model-v2 cutover.
+ *
+ * - Flag OFF (default / current prod): falls back to the legacy
+ *   `requireTenant` path and returns `{ tenant, user, membership, parent: null,
+ *   tenantParent: null }`. Existing parents who booked before this branch
+ *   only have a PARENT-role Membership, so this preserves their access.
+ * - Flag ON: delegates to `requireParentAccess` and returns
+ *   `{ tenant, user, parent, tenantParent, membership: null }`. Parents who
+ *   haven't been migrated will redirect to /t/[slug]/forbidden.
+ */
+export type FamilyAccess = {
+  tenant: Tenant;
+  user: User;
+  parent: Parent | null;
+  tenantParent: TenantParent | null;
+  membership: Membership | null;
+};
+
+export async function requireFamilyAccess(slug: string): Promise<FamilyAccess> {
+  if (parentModelV2Enabled()) {
+    const acc = await requireParentAccess(slug);
+    return {
+      tenant: acc.tenant,
+      user: acc.user,
+      parent: acc.parent,
+      tenantParent: acc.tenantParent,
+      membership: null,
+    };
+  }
+  // Legacy path — the FamilyGroupLayout already enforces
+  // isPortalAllowed(role, "family"), so we don't re-check role here.
+  const { tenant, user, membership } = await requireTenant(slug);
+  return { tenant, user, parent: null, tenantParent: null, membership };
 }
 

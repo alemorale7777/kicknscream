@@ -1,4 +1,4 @@
-import { requireTenant } from "@/lib/tenant";
+import { requireFamilyAccess } from "@/lib/tenant";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
@@ -14,9 +14,9 @@ export default async function FamilySchedulePage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const { tenant, user } = await requireTenant(slug);
+  const { tenant, user, parent } = await requireFamilyAccess(slug);
 
-  const rows = await loadUpcomingFamilyEvents(tenant.id, user.id);
+  const rows = await loadUpcomingFamilyEvents(tenant.id, user.id, { parent });
   const tz = tenant.timeZone ?? "America/Los_Angeles";
 
   return (

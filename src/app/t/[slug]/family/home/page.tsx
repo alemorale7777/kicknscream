@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { requireTenant } from "@/lib/tenant";
+import { requireFamilyAccess } from "@/lib/tenant";
 import { db } from "@/lib/db";
+import { parentModelV2Enabled } from "@/lib/env";
 import { NextSessionHero } from "@/components/family/NextSessionHero";
 import { KidsCarousel } from "@/components/family/KidsCarousel";
 import { OutstandingStrip } from "@/components/family/OutstandingStrip";
@@ -36,21 +37,26 @@ export default async function FamilyHomePage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const { tenant, user } = await requireTenant(slug);
+  const { tenant, user, parent } = await requireFamilyAccess(slug);
+
+  const playerWhere =
+    parentModelV2Enabled() && parent
+      ? { tenantId: tenant.id, parentRefId: parent.id }
+      : {
+          tenantId: tenant.id,
+          OR: [
+            { parentId: user.id },
+            { parentLinks: { some: { parentUserId: user.id } } },
+          ],
+        };
 
   const players = await db.player.findMany({
-    where: {
-      tenantId: tenant.id,
-      OR: [
-        { parentId: user.id },
-        { parentLinks: { some: { parentUserId: user.id } } },
-      ],
-    },
+    where: playerWhere,
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
   });
 
   const [familyEvents, invoices, pendingWaivers] = await Promise.all([
-    loadUpcomingFamilyEvents(tenant.id, user.id, { limit: 50 }),
+    loadUpcomingFamilyEvents(tenant.id, user.id, { limit: 50, parent }),
     db.invoice.findMany({
       where: { tenantId: tenant.id, payerEmail: user.email ?? "@@none@@" },
       orderBy: { createdAt: "desc" },
