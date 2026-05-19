@@ -609,3 +609,69 @@ export async function sendFamilyDigestEmail(opts: {
     text,
   });
 }
+
+/**
+ * GDPR deletion request email — sent when a staff member at any tenant
+ * triggers a global-deletion request. The parent must click the confirm
+ * link in this email before the anonymization pipeline runs. Link expires
+ * in 7 days per Task 22 spec.
+ */
+export async function sendParentDeletionRequestEmail(opts: {
+  to: string;
+  parentName: string | null;
+  confirmUrl: string;
+  tenantName: string;
+}) {
+  const resend = new Resend(env.AUTH_RESEND_KEY);
+  const html = `<!DOCTYPE html><html><body style="font-family:-apple-system,sans-serif;background:#050A07;color:#F5F7F4;margin:0;padding:32px;">
+  <div style="max-width:560px;margin:0 auto;">
+    <h1 style="font-size:22px;">Confirm deletion of your KickNScream account</h1>
+    <p>Hi${opts.parentName ? " " + escapeHtml(opts.parentName) : ""},</p>
+    <p>Someone at <strong>${escapeHtml(opts.tenantName)}</strong> has requested deletion of your KickNScream account. If you confirm, we'll anonymize:</p>
+    <ul>
+      <li>Your name, email, and phone</li>
+      <li>Your kids' names and photos</li>
+      <li>Coach notes about you</li>
+      <li>Your access to every tenant you're registered with</li>
+    </ul>
+    <p>Financial records (invoices and payments) are kept with your name removed for legal accounting purposes.</p>
+    <p style="margin:24px 0;text-align:center;">
+      <a href="${opts.confirmUrl}" style="display:inline-block;padding:14px 28px;background:#D33;color:#fff;border-radius:8px;font-weight:600;text-decoration:none;">Confirm deletion</a>
+    </p>
+    <p style="font-size:12px;color:#94A39B;">This link expires in 7 days. If you didn't request deletion, just ignore this email.</p>
+  </div></body></html>`;
+  await resend.emails.send({
+    from: env.EMAIL_FROM,
+    to: opts.to,
+    subject: "Confirm deletion of your KickNScream account",
+    html,
+    text: `Confirm deletion: ${opts.confirmUrl}\n\nLink expires in 7 days.`,
+  });
+}
+
+/**
+ * Receipt email sent to the parent's ORIGINAL (pre-anonymization) email
+ * after the deletion transaction commits. Fires outside the transaction —
+ * an email failure must not roll back the anonymization.
+ */
+export async function sendParentDeletionReceiptEmail(opts: {
+  to: string;
+  parentName: string | null;
+}) {
+  const resend = new Resend(env.AUTH_RESEND_KEY);
+  const html = `<!DOCTYPE html><html><body style="font-family:-apple-system,sans-serif;background:#050A07;color:#F5F7F4;margin:0;padding:32px;">
+  <div style="max-width:560px;margin:0 auto;">
+    <h1 style="font-size:22px;">Your KickNScream account has been deleted</h1>
+    <p>Hi${opts.parentName ? " " + escapeHtml(opts.parentName) : ""},</p>
+    <p>Your KickNScream account is gone. Your name, email, phone, kids' names + photos, and any coach notes have been anonymized.</p>
+    <p>Payment records held by each tenant and by Stripe remain for accounting and legal compliance. To request deletion at Stripe, contact each tenant directly.</p>
+    <p>Thanks for using KickNScream.</p>
+  </div></body></html>`;
+  await resend.emails.send({
+    from: env.EMAIL_FROM,
+    to: opts.to,
+    subject: "Your KickNScream account has been deleted",
+    html,
+    text: `Your KickNScream account has been deleted.`,
+  });
+}
