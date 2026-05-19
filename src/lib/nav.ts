@@ -19,6 +19,7 @@ import {
   Palette,
   ScrollText,
   Download,
+  UsersRound,
   type LucideIcon,
 } from "lucide-react";
 
@@ -30,7 +31,7 @@ export type NavItem = {
 
 /**
  * Tenant-typed nav configuration.
- * COACH: 6 items, INSTITUTION: 9, CLUB: 8.
+ * COACH: 10 items, INSTITUTION: 11, CLUB: 10.
  * Order matters — first item is the active default on dashboard load.
  */
 export function navForTenantType(type: TenantType, slug = ":slug"): NavItem[] {
@@ -46,6 +47,7 @@ export function navForTenantType(type: TenantType, slug = ":slug"): NavItem[] {
         { label: "Bookings", href: `${base}/bookings`, icon: ClipboardList },
         { label: "Schedule", href: `${base}/schedule`, icon: Calendar },
         { label: "Players", href: `${base}/roster`, icon: Users },
+        { label: "Parents", href: `${base}/parents`, icon: UsersRound },
         { label: "Messages", href: `${base}/messages`, icon: MessageSquare },
         { label: "Notes", href: `${base}/notes`, icon: NotebookPen },
         { label: "Reports", href: `${base}/reports`, icon: BarChart3 },
@@ -57,6 +59,7 @@ export function navForTenantType(type: TenantType, slug = ":slug"): NavItem[] {
         { label: "Programs", href: `${base}/programs`, icon: GraduationCap },
         { label: "Schedule", href: `${base}/schedule`, icon: Calendar },
         { label: "Roster", href: `${base}/roster`, icon: Users },
+        { label: "Parents", href: `${base}/parents`, icon: UsersRound },
         { label: "Attendance", href: `${base}/attendance`, icon: ClipboardList },
         { label: "Payments", href: `${base}/payments`, icon: Wallet },
         { label: "Messages", href: `${base}/messages`, icon: MessageSquare },
@@ -70,6 +73,7 @@ export function navForTenantType(type: TenantType, slug = ":slug"): NavItem[] {
         { label: "Teams", href: `${base}/teams`, icon: Trophy },
         { label: "Schedule", href: `${base}/schedule`, icon: Calendar },
         { label: "Roster", href: `${base}/roster`, icon: Users },
+        { label: "Parents", href: `${base}/parents`, icon: UsersRound },
         { label: "Tryouts", href: `${base}/tryouts`, icon: Search },
         { label: "Development", href: `${base}/development`, icon: Sparkles },
         { label: "Notes", href: `${base}/notes`, icon: NotebookPen },
