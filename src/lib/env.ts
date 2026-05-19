@@ -25,6 +25,7 @@ const envSchema = z.object({
   VERCEL_TOKEN: z.string().optional(),
   VERCEL_PROJECT_ID: z.string().optional(),
   VERCEL_TEAM_ID: z.string().optional(),
+  AUDIT_EMAIL_HMAC_SECRET: z.string().min(32, "Must be at least 32 chars"),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 });
 
