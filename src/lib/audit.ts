@@ -34,6 +34,21 @@ export type AuditAction =
   | "team.role_change"
   // one-off ops actions (Phase B parent-model split, etc.)
   | "data.parent_backfill"
+  | "data.audit_backfill"
+  // Phase B parent-model split — parent CRUD + claim + delete-request lifecycle
+  | "parent.create"
+  | "parent.claim"
+  | "parent.update"
+  | "parent.merge"
+  | "parent.delete_request"
+  | "parent.delete_request_expired"
+  | "parent.delete_complete"
+  | "parent.delete_complete_admin_override"
+  | "parent.claim_email_sent"
+  | "tenant_parent.add"
+  | "tenant_parent.revoke"
+  | "tenant_parent.restore"
+  | "tenant_parent.notes_update"
   | (string & {});
 
 /**
