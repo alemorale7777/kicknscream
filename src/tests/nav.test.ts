@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { navForTenantType, NEXT_STEP_BY_TYPE } from "@/lib/nav";
+import { adminNavForRole, navForTenantType, NEXT_STEP_BY_TYPE } from "@/lib/nav";
 
 describe("navForTenantType", () => {
   it("returns coach nav with 9 items in order", () => {
@@ -55,6 +55,35 @@ describe("navForTenantType", () => {
   it("falls back to :slug placeholder when slug omitted", () => {
     const items = navForTenantType("INSTITUTION");
     expect(items[0].href).toBe("/t/:slug/coach/dashboard");
+  });
+});
+
+describe("adminNavForRole", () => {
+  it("returns the admin section for OWNER", () => {
+    const items = adminNavForRole("OWNER", "alej");
+    expect(items.map((i) => i.label)).toEqual([
+      "Team",
+      "Permissions",
+      "Billing",
+      "Branding",
+      "Audit log",
+      "Exports",
+    ]);
+    expect(items[0].href).toBe("/t/alej/admin/team");
+  });
+
+  it("returns the admin section for ADMIN", () => {
+    const items = adminNavForRole("ADMIN", "alej");
+    expect(items).toHaveLength(6);
+  });
+
+  it("returns an empty array for COACH", () => {
+    expect(adminNavForRole("COACH", "alej")).toEqual([]);
+  });
+
+  it("returns an empty array for PARENT and PLAYER", () => {
+    expect(adminNavForRole("PARENT", "alej")).toEqual([]);
+    expect(adminNavForRole("PLAYER", "alej")).toEqual([]);
   });
 });
 

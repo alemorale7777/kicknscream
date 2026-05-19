@@ -6,17 +6,44 @@ import { cn } from "@/lib/utils";
 import { Building2, MapPin, Users, AlertTriangle, Wallet, Bell } from "lucide-react";
 import type { Tenant } from "@prisma/client";
 
-export function SettingsNav({ tenant, isOwner }: { tenant: Tenant; isOwner: boolean }) {
+export function SettingsNav({
+  tenant,
+  isOwner,
+  canManage,
+}: {
+  tenant: Tenant;
+  isOwner: boolean;
+  /** True for OWNER/ADMIN — gates rows that resolve to admin-shell routes. */
+  canManage?: boolean;
+}) {
   const pathname = usePathname();
   const base = `/t/${tenant.slug}/coach/settings`;
+  const adminBase = `/t/${tenant.slug}/admin`;
 
-  const items = [
+  type Item = {
+    href: string;
+    label: string;
+    icon: typeof Building2;
+    danger?: boolean;
+    /** Hint that the row jumps to the admin shell — rendered as an "Admin" pill. */
+    admin?: boolean;
+  };
+
+  const items: Item[] = [
     { href: base, label: "Tenant info", icon: Building2 },
-    ...(tenant.type !== "COACH" ? [{ href: `${base}/locations`, label: "Locations", icon: MapPin }] : []),
-    { href: `${base}/billing`, label: "Billing", icon: Wallet },
+    ...(tenant.type !== "COACH"
+      ? [{ href: `${base}/locations`, label: "Locations", icon: MapPin }]
+      : []),
+    // Billing surface lives at /admin/billing. Only render this row to
+    // OWNER/ADMIN — non-managers would bounce off the portal gate.
+    ...(canManage
+      ? [{ href: `${adminBase}/billing`, label: "Billing", icon: Wallet, admin: true }]
+      : []),
     { href: `${base}/team`, label: "Team", icon: Users },
     { href: `${base}/notifications`, label: "Notifications", icon: Bell },
-    ...(isOwner ? [{ href: `${base}/danger`, label: "Danger zone", icon: AlertTriangle, danger: true }] : []),
+    ...(isOwner
+      ? [{ href: `${base}/danger`, label: "Danger zone", icon: AlertTriangle, danger: true }]
+      : []),
   ];
 
   return (
@@ -24,7 +51,7 @@ export function SettingsNav({ tenant, isOwner }: { tenant: Tenant; isOwner: bool
       {items.map((item) => {
         const active = pathname === item.href;
         const Icon = item.icon;
-        const isDanger = "danger" in item && item.danger;
+        const isDanger = item.danger === true;
         return (
           <Link
             key={item.href}
@@ -41,7 +68,12 @@ export function SettingsNav({ tenant, isOwner }: { tenant: Tenant; isOwner: bool
             )}
           >
             <Icon className="h-4 w-4" />
-            {item.label}
+            <span className="flex-1">{item.label}</span>
+            {item.admin && (
+              <span className="inline-flex items-center rounded bg-pitch-700 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.14em] text-ink-300 font-medium">
+                Admin
+              </span>
+            )}
           </Link>
         );
       })}

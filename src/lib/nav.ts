@@ -1,4 +1,5 @@
-import type { TenantType } from "@prisma/client";
+import type { Role, TenantType } from "@prisma/client";
+import { canManageTenant } from "@/lib/roles";
 import {
   LayoutDashboard,
   Calendar,
@@ -13,6 +14,11 @@ import {
   Search,
   Sparkles,
   NotebookPen,
+  Shield,
+  CreditCard,
+  Palette,
+  ScrollText,
+  Download,
   type LucideIcon,
 } from "lucide-react";
 
@@ -71,6 +77,27 @@ export function navForTenantType(type: TenantType, slug = ":slug"): NavItem[] {
         { label: "Settings", href: `${base}/settings`, icon: Settings },
       ];
   }
+}
+
+/**
+ * Admin-section nav, shown beneath the primary sidebar for OWNER and ADMIN
+ * memberships. These routes live under the /admin/* portal segment and were
+ * previously discoverable only via dashboard CTAs — surfacing them in the
+ * sidebar closes the "two parallel shells" gap reported in the 2026-05-19
+ * audit. Returns an empty array for any non-admin role so callers can render
+ * unconditionally.
+ */
+export function adminNavForRole(role: Role, slug = ":slug"): NavItem[] {
+  if (!canManageTenant(role)) return [];
+  const base = `/t/${slug}/admin`;
+  return [
+    { label: "Team", href: `${base}/team`, icon: Users },
+    { label: "Permissions", href: `${base}/permissions`, icon: Shield },
+    { label: "Billing", href: `${base}/billing`, icon: CreditCard },
+    { label: "Branding", href: `${base}/branding`, icon: Palette },
+    { label: "Audit log", href: `${base}/audit`, icon: ScrollText },
+    { label: "Exports", href: `${base}/exports`, icon: Download },
+  ];
 }
 
 export const NEXT_STEP_BY_TYPE: Record<TenantType, { title: string; copy: string; cta: string; href: (slug: string) => string }> = {

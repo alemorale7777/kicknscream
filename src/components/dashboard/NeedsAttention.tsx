@@ -61,7 +61,14 @@ export function NeedsAttention({ items }: { items: AttentionItem[] }) {
                     <Icon className="h-4 w-4" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-ink-50 truncate">{item.title}</p>
+                    <p className="font-semibold text-ink-50 truncate flex items-center gap-2">
+                      <span className="truncate">{item.title}</span>
+                      {item.href.includes("/admin/") && (
+                        <span className="shrink-0 inline-flex items-center rounded bg-pitch-700 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.14em] text-ink-300 font-medium">
+                          Admin
+                        </span>
+                      )}
+                    </p>
                     <p className="text-xs text-ink-500 truncate">{item.detail}</p>
                   </div>
                   <div className="shrink-0 flex items-center gap-1 text-xs font-medium text-ink-300 group-hover:text-warn group-hover:translate-x-0.5 transition-all duration-[150ms] ease-out">
