@@ -3,6 +3,8 @@ import { db } from "@/lib/db";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PayInvoiceButton } from "@/components/family/PayInvoiceButton";
+import { BillingPortalButton } from "@/components/family/BillingPortalButton";
+import { parentHasSubscriptions } from "@/lib/family/subscriptions";
 import { formatCents } from "@/lib/utils";
 import { format } from "date-fns";
 import { Wallet, CheckCircle2 } from "lucide-react";
@@ -26,6 +28,8 @@ export default async function FamilyPayPage({
     include: { payments: { select: { amount: true } } },
   });
 
+  const showBillingPortal = await parentHasSubscriptions(tenant.id, user.email);
+
   const enriched = invoices.map((inv) => {
     const paidSoFar = inv.payments.reduce((acc, p) => acc + p.amount, 0);
     return { ...inv, paidSoFar, remainingCents: Math.max(0, inv.amount - paidSoFar) };
@@ -43,6 +47,8 @@ export default async function FamilyPayPage({
         <p className="text-sm uppercase tracking-[0.2em] text-ink-500">Payments</p>
         <h1 className="text-3xl font-bold tracking-[-0.03em]">Your invoices</h1>
       </header>
+
+      {showBillingPortal && <BillingPortalButton tenantId={tenant.id} />}
 
       {sp.paid === "1" && (
         <Card className="p-4 border-turf-400/40 bg-turf-400/5">

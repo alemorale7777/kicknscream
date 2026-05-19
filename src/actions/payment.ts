@@ -327,6 +327,53 @@ export async function createParentInvoiceCheckoutAction(
   return { url: session.url };
 }
 
+const portalSchema = z.object({ tenantId: z.string() });
+
+/**
+ * Open a Stripe Customer Portal session for the current parent on the
+ * tenant's connected account. Used for managing MONTHLY subscriptions
+ * (cancel, update card, view receipts).
+ *
+ * Throws "no subscription found" when the parent has no Stripe
+ * customer on the tenant — the UI is supposed to gate this via
+ * parentHasSubscriptions, but defend the server-side anyway.
+ */
+export async function createBillingPortalSessionAction(
+  input: z.infer<typeof portalSchema>
+): Promise<{ url: string }> {
+  const data = portalSchema.parse(input);
+  const user = await getCurrentUser();
+  if (!user) throw new Error("Not authenticated");
+  if (!user.email) throw new Error("Missing email on account");
+
+  const tenant = await db.tenant.findUnique({ where: { id: data.tenantId } });
+  if (!tenant) throw new Error("Tenant not found");
+  if (!stripeEnabled() || !tenant.stripeAccountId) {
+    throw new Error("Billing isn't configured for this tenant");
+  }
+
+  const stripe = getStripe();
+  const customers = await stripe.customers.list(
+    { email: user.email, limit: 1 },
+    { stripeAccount: tenant.stripeAccountId }
+  );
+  const customer = customers.data[0];
+  if (!customer) {
+    throw new Error("No subscription found on this tenant");
+  }
+
+  const session = await stripe.billingPortal.sessions.create(
+    {
+      customer: customer.id,
+      return_url: `${env.NEXTAUTH_URL}/t/${tenant.slug}/family/pay`,
+    },
+    { stripeAccount: tenant.stripeAccountId }
+  );
+
+  if (!session.url) throw new Error("Stripe didn't return a portal URL");
+  return { url: session.url };
+}
+
 const reminderSchema = z.object({ tenantId: z.string(), invoiceId: z.string() });
 export async function sendBalanceReminderAction(input: z.infer<typeof reminderSchema>) {
   const data = reminderSchema.parse(input);
