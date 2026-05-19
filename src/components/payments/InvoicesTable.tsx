@@ -20,6 +20,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { RecordPaymentDialog } from "./RecordPaymentDialog";
+import { RefundButton } from "./RefundButton";
 import { toast } from "sonner";
 import { sendBalanceReminderAction, voidInvoiceAction } from "@/actions/payment";
 import { formatCents, cn } from "@/lib/utils";
@@ -225,6 +226,22 @@ export function InvoicesTable({
                       </p>
                     )}
                   </div>
+                  {canEdit && (() => {
+                    // Refundable = positive payments minus existing refund (negative) payments.
+                    const refundableCents = i.payments.reduce((acc, p) => acc + p.amount, 0);
+                    const showRefund =
+                      (i.status === "PAID" || i.status === "PARTIAL") &&
+                      refundableCents > 0;
+                    return showRefund ? (
+                      <RefundButton
+                        tenantId={tenantId}
+                        invoiceId={i.id}
+                        remainingCents={refundableCents}
+                        isStripe={!!i.stripePaymentIntentId}
+                        description={i.description}
+                      />
+                    ) : null;
+                  })()}
                   {canEdit && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
