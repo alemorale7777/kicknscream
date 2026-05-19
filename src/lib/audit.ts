@@ -32,15 +32,21 @@ export type AuditAction =
   | "roster.bulk_import"
   | "bookingDraft.create"
   | "team.role_change"
+  // one-off ops actions (Phase B parent-model split, etc.)
+  | "data.parent_backfill"
   | (string & {});
 
 /**
  * Write a single audit-log row. Catches and logs (does not throw) so an
  * audit-write failure can never break the user-facing action — auditing
  * should observe state, not gate it.
+ *
+ * `tenantId` accepts `null` for one-off ops actions (e.g. data backfills)
+ * that span the whole instance rather than a single tenant. The DB column
+ * is nullable to support this.
  */
 export async function logAudit(input: {
-  tenantId: string;
+  tenantId: string | null;
   actorUserId?: string | null;
   action: AuditAction;
   targetType?: string;
