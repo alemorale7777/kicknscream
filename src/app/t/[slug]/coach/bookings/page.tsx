@@ -76,10 +76,14 @@ export default async function BookingsPage({ params }: { params: Promise<{ slug:
         eyebrow="Bookings"
         title="Incoming registrations"
         count={`${rows.length} total`}
-        description="Filter by status, search by player or parent. Click any row to open the event detail."
+        description="Filter by status, search by player or parent. Click any row to open the linked event or player profile."
       />
 
-      <BookingsTable tenantSlug={tenant.slug} rows={rows} />
+      <BookingsTable
+        tenantSlug={tenant.slug}
+        tenantTimeZone={tenant.timeZone ?? "America/Los_Angeles"}
+        rows={rows}
+      />
     </div>
   );
 }

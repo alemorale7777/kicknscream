@@ -246,6 +246,9 @@ model Event {
   locationId        String?
   type              EventType
   title             String
+  // Optional free-form notes shown on the event-detail page and in the
+  // EventDialog edit drawer. Sprint 2 add for KNS-14.
+  description       String?
   startsAt          DateTime
   endsAt            DateTime
   capacity          Int?
@@ -408,6 +411,9 @@ model Invoice {
   enrollments           Enrollment[]
   tenant                Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   createdAt             DateTime      @default(now())
+  // When the invoice is considered past due. Sprint 2 default: 24h after the
+  // booked session. Older rows have NULL → never auto-flagged OVERDUE.
+  dueAt                 DateTime?
   paidAt                DateTime?
 
   @@index([tenantId, status])

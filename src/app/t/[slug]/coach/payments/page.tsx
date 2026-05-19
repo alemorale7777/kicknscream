@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { Card, CardContent } from "@/components/ui/card";
 import { InvoicesTable } from "@/components/payments/InvoicesTable";
 import { formatCents } from "@/lib/utils";
-import { isPast } from "date-fns";
+import { isInvoiceOverdue } from "@/lib/invoiceStatus";
 import { Wallet, CheckCircle2, AlertTriangle, TrendingUp } from "lucide-react";
 
 export const metadata = { title: "Payments" };
@@ -32,11 +32,7 @@ export default async function PaymentsPage({ params }: { params: Promise<{ slug:
       const paid = i.payments.reduce((s, p) => s + p.amount, 0);
       return sum + (i.amount - paid);
     }, 0);
-  const overdueCount = invoices.filter(
-    (i) =>
-      (i.status === "SENT" || i.status === "PARTIAL") &&
-      isPast(i.createdAt)
-  ).length;
+  const overdueCount = invoices.filter((i) => isInvoiceOverdue(i)).length;
   const paidCount = invoices.filter((i) => i.status === "PAID").length;
 
   return (
@@ -82,7 +78,13 @@ export default async function PaymentsPage({ params }: { params: Promise<{ slug:
         />
       </section>
 
-      <InvoicesTable tenantId={tenant.id} invoices={invoices} canEdit={canEdit} />
+      <InvoicesTable
+        tenantId={tenant.id}
+        tenantSlug={tenant.slug}
+        tenantTimeZone={tenant.timeZone ?? "America/Los_Angeles"}
+        invoices={invoices}
+        canEdit={canEdit}
+      />
     </div>
   );
 }

@@ -5,7 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { Markdown } from "@/components/schedule/Markdown";
 import { EVENT_TONE, toneChipStyle } from "@/lib/eventTone";
 import { formatCents } from "@/lib/utils";
-import { format, formatDistanceToNow, differenceInYears, isPast } from "date-fns";
+import { formatDistanceToNow, differenceInYears } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
+import { invoiceDisplayStatus } from "@/lib/invoiceStatus";
 import {
   Calendar,
   Clock,
@@ -41,6 +43,7 @@ export function ParentDashboard({
   recentNotes: NoteWithEvent[];
   invoices: Invoice[];
 }) {
+  const tz = tenant.timeZone ?? "America/Los_Angeles";
   const firstName = parent.name?.split(" ")[0] ?? "there";
   const outstandingBalance = invoices
     .filter((i) => i.status === "SENT" || i.status === "PARTIAL" || i.status === "OVERDUE")
@@ -84,7 +87,7 @@ export function ParentDashboard({
                         {p.firstName} {p.lastName}
                       </p>
                       <p className="text-xs text-ink-500">
-                        Age {age} · {format(p.dob, "MMM d, yyyy")}
+                        Age {age} · {formatInTimeZone(p.dob, tz, "MMM d, yyyy")}
                       </p>
                     </div>
                   </div>
@@ -147,8 +150,8 @@ export function ParentDashboard({
               return (
                 <Card key={e.id} className="p-4 flex items-center gap-4 hover:border-turf-400/40 transition-colors">
                   <div className="text-center w-14 shrink-0 border-r border-line pr-3 font-mono">
-                    <p className="text-[10px] uppercase tracking-wider text-ink-500">{format(e.startsAt, "MMM")}</p>
-                    <p className="text-2xl font-bold leading-none mt-0.5">{format(e.startsAt, "d")}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-ink-500">{formatInTimeZone(e.startsAt, tz, "MMM")}</p>
+                    <p className="text-2xl font-bold leading-none mt-0.5">{formatInTimeZone(e.startsAt, tz, "d")}</p>
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -164,7 +167,7 @@ export function ParentDashboard({
                     <div className="flex items-center gap-3 text-xs text-ink-500 mt-1">
                       <span className="inline-flex items-center gap-1">
                         <Clock className="h-3 w-3" />
-                        {format(e.startsAt, "EEE h:mm a")}
+                        {formatInTimeZone(e.startsAt, tz, "EEE h:mm a")}
                       </span>
                       {e.location && (
                         <span className="inline-flex items-center gap-1">
@@ -231,14 +234,14 @@ export function ParentDashboard({
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{i.description ?? "Invoice"}</p>
                     <p className="text-xs text-ink-500">
-                      {format(i.createdAt, "MMM d, yyyy")}
-                      {i.paidAt && ` · paid ${format(i.paidAt, "MMM d")}`}
+                      {formatInTimeZone(i.createdAt, tz, "MMM d, yyyy")}
+                      {i.paidAt && ` · paid ${formatInTimeZone(i.paidAt, tz, "MMM d")}`}
                     </p>
                   </div>
                   <div className="text-right shrink-0">
                     <p className="font-mono font-bold">{formatCents(i.amount)}</p>
                     <p className="text-[10px] uppercase tracking-wider text-ink-500">
-                      <InvoiceStatusBadge status={i.status} dueWhen={i.createdAt} />
+                      <InvoiceStatusBadge status={invoiceDisplayStatus(i)} />
                     </p>
                   </div>
                 </div>
@@ -284,11 +287,9 @@ function StatCard({
   );
 }
 
-function InvoiceStatusBadge({ status, dueWhen }: { status: string; dueWhen: Date }) {
+function InvoiceStatusBadge({ status }: { status: string }) {
   if (status === "PAID") return <span className="text-turf-300">paid</span>;
-  if (status === "OVERDUE" || (status === "SENT" && isPast(dueWhen))) {
-    return <span className="text-danger">overdue</span>;
-  }
+  if (status === "OVERDUE") return <span className="text-danger">overdue</span>;
   if (status === "PARTIAL") return <span className="text-warn">partial</span>;
   return <span>{status.toLowerCase()}</span>;
 }

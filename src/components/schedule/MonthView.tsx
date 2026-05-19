@@ -132,7 +132,7 @@ export function MonthView({
                         className="h-1.5 w-1.5 rounded-full shrink-0"
                         style={{ backgroundColor: tone.accent }}
                       />
-                      <span className="font-mono text-[9px] opacity-80 shrink-0">{formatInTimeZone(e.startsAt, tenantTimeZone, "HHmm")}</span>
+                      <span className="font-mono text-[9px] opacity-80 shrink-0">{formatInTimeZone(e.startsAt, tenantTimeZone, "h:mm a")}</span>
                       <span className="truncate font-medium">{e.title}</span>
                     </div>
                   );

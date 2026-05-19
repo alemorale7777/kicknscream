@@ -33,7 +33,7 @@ export async function saveBookingDraftAction(
 
   const tenant = await db.tenant.findUnique({
     where: { slug: data.tenantSlug },
-    select: { id: true, name: true, slug: true },
+    select: { id: true, name: true, slug: true, timeZone: true },
   });
   if (!tenant) throw new Error("Tenant not found");
 
@@ -91,6 +91,7 @@ export async function saveBookingDraftAction(
     programName: program.name,
     startsAt,
     resumeUrl,
+    timeZone: tenant.timeZone ?? undefined,
   }).catch(() => {
     // Best-effort — draft is saved either way.
   });

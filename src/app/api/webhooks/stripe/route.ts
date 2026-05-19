@@ -104,6 +104,7 @@ export async function POST(req: Request) {
             startsAt: event.startsAt,
             endsAt: event.endsAt,
             amountCents: invoice.amount,
+            timeZone: invoice.tenant.timeZone ?? undefined,
           }).catch(() => {});
         }
       }

@@ -59,6 +59,7 @@ export async function createSessionNoteAction(input: z.infer<typeof createSchema
           eventTitle: event.title,
           eventDate: event.startsAt,
           content: data.content,
+          timeZone: membership.tenant.timeZone ?? undefined,
         }).catch(() => {});
       }
     }

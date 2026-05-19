@@ -1,7 +1,8 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ChalkGrid } from "@/components/brand/ChalkGrid";
-import { format, formatDistanceToNowStrict } from "date-fns";
+import { formatDistanceToNowStrict } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { Calendar, MapPin, Clock, ArrowRight, ExternalLink } from "lucide-react";
 import { IcsDownloadButton } from "./IcsDownloadButton";
 import { WeatherChip } from "./WeatherChip";
@@ -11,11 +12,13 @@ import type { WeatherSummary } from "@/lib/weather";
 
 export function NextSessionHero({
   tenantSlug,
+  tenantTimeZone,
   event,
   player,
   weather,
 }: {
   tenantSlug: string;
+  tenantTimeZone: string;
   event: (Event & { location: Location | null }) | null;
   player: Player;
   weather?: WeatherSummary | null;
@@ -61,7 +64,7 @@ export function NextSessionHero({
         <div className="grid sm:grid-cols-2 gap-3 text-sm">
           <div className="inline-flex items-center gap-2 text-ink-300">
             <Clock className="h-4 w-4 text-ink-500" />
-            <span className="font-mono">{format(event.startsAt, "EEE, MMM d · h:mm a")}</span>
+            <span className="font-mono">{formatInTimeZone(event.startsAt, tenantTimeZone, "EEE, MMM d · h:mm a")}</span>
           </div>
           {event.location && (
             <div className="inline-flex items-center gap-2 text-ink-300">

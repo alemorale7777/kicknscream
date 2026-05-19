@@ -61,7 +61,7 @@ export async function GET() {
       try {
         const tenant = await db.tenant.findUnique({
           where: { id: m.tenantId },
-          select: { id: true, name: true, slug: true },
+          select: { id: true, name: true, slug: true, timeZone: true },
         });
         if (!tenant) continue;
         const players = await db.player.findMany({
@@ -158,6 +158,7 @@ export async function GET() {
           tenantName: tenant.name,
           tenantSlug: tenant.slug,
           kids,
+          timeZone: tenant.timeZone ?? undefined,
         });
         sent++;
       } catch (err) {
