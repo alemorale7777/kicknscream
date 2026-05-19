@@ -85,7 +85,7 @@ export default async function AdminAuditPage({
         eyebrow="Audit log"
         title="Tenant activity"
         count={`${entries.length} ${entries.length === 1 ? "entry" : "entries"} · last 200`}
-        description="Every change to tenant settings, permissions, roster imports, and Stripe state is logged here. Useful for compliance and for debugging billing surprises."
+        description="Bookings, parent changes, roster edits, payments, refunds, attendance, permissions, exports, and parent-deletion events all write rows here. Useful for compliance and for debugging billing surprises."
       />
 
       {entries.length === 0 ? (
