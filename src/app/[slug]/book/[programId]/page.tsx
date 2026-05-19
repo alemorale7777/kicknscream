@@ -37,17 +37,35 @@ export default async function BookProgramPage({
   // selectable date.
   const windowStart = new Date();
   const windowEnd = addDays(new Date(), 65);
-  const busyEvents = await db.event.findMany({
-    where: {
-      tenantId: tenant.id,
-      startsAt: { gte: windowStart, lte: windowEnd },
-    },
-    select: { startsAt: true, endsAt: true },
-  });
-  const busyStartsAt = busyEvents.map((e) => ({
-    startsAt: e.startsAt.toISOString(),
-    endsAt: e.endsAt.toISOString(),
-  }));
+  const [busyEvents, heldDrafts] = await Promise.all([
+    db.event.findMany({
+      where: {
+        tenantId: tenant.id,
+        startsAt: { gte: windowStart, lte: windowEnd },
+      },
+      select: { startsAt: true, endsAt: true },
+    }),
+    // Active drafts on this program count as held slots — hide them from
+    // the availability picker so two parents can't both pick 10am Sat.
+    db.bookingDraft.findMany({
+      where: {
+        programId: program.id,
+        claimedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      select: { startsAt: true, endsAt: true },
+    }),
+  ]);
+  const busyStartsAt = [
+    ...busyEvents.map((e) => ({
+      startsAt: e.startsAt.toISOString(),
+      endsAt: e.endsAt.toISOString(),
+    })),
+    ...heldDrafts.map((d) => ({
+      startsAt: d.startsAt.toISOString(),
+      endsAt: d.endsAt.toISOString(),
+    })),
+  ];
   if (program.archived) {
     return (
       <Shell>
