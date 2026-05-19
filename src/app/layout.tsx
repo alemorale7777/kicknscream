@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   },
   description:
     "The modern operations platform for soccer coaches, academies, and clubs. Bookings, programs, attendance, payments, comms — built mobile-first.",
-  keywords: ["soccer", "coaching", "academy", "club", "youth sports", "SportsEngine alternative"],
+  keywords: ["soccer", "coaching", "academy", "club", "youth sports", "team management"],
   authors: [{ name: "KickNScream" }],
   manifest: "/manifest.webmanifest",
   appleWebApp: {

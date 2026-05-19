@@ -109,7 +109,7 @@ export function NotificationPreferencesForm({ initial }: { initial: Prefs }) {
       <ChannelGroup
         icon={Phone}
         label="SMS"
-        description="Text-message notifications. Coming soon — opt in here and we'll wire your number to the next release."
+        description="Text-message notifications are in private beta. Opt in now and we'll switch them on for your account when we widen access — email reminders cover the same events for now."
         muted={!prefs.smsOptIn}
       >
         <PrefRow
