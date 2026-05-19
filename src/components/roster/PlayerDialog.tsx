@@ -26,7 +26,13 @@ import type { Player } from "@prisma/client";
 const schema = z.object({
   firstName: z.string().min(1, "Required").max(60),
   lastName: z.string().min(1, "Required").max(60),
-  dob: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD"),
+  // DOB is required — the old "Use YYYY-MM-DD" message was misleading
+  // because the native date picker already enforces format; an empty
+  // value just means the user hasn't picked one.
+  dob: z
+    .string()
+    .min(1, "Pick a date of birth")
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a date of birth"),
   position: z.string().max(40).optional(),
   jerseyNumber: z.string().optional(),
   notes: z.string().max(2000).optional(),

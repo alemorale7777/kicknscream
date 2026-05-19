@@ -230,7 +230,10 @@ export default async function PublicTenantPage({
           <Wordmark size="sm" />
         </Link>
         <Button variant="ghost" size="sm" asChild>
-          <Link href="/auth/signin">Sign in</Link>
+          {/* Default sign-in destination is THIS tenant's coach dashboard
+              when the visitor is a coach/admin, or the family home for a
+              parent. NextAuth honors callbackUrl after auth. */}
+          <Link href={`/auth/signin?callbackUrl=/t/${tenant.slug}/coach/dashboard`}>Sign in</Link>
         </Button>
       </header>
 
@@ -418,7 +421,7 @@ export default async function PublicTenantPage({
                 <Link href={`/auth/signin?callbackUrl=/t/${tenant.slug}/coach/dashboard`}>{copy.cta}</Link>
               </Button>
               <Button variant="outline" size="lg" asChild>
-                <Link href="/auth/signin">Sign in</Link>
+                <Link href={`/auth/signin?callbackUrl=/t/${tenant.slug}/coach/dashboard`}>Sign in</Link>
               </Button>
             </div>
           </div>

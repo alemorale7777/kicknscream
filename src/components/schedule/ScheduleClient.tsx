@@ -38,6 +38,7 @@ export function ScheduleClient({
   tenantTimeZone,
   events,
   locations,
+  programs = [],
   canEdit,
 }: {
   tenantId: string;
@@ -45,6 +46,7 @@ export function ScheduleClient({
   tenantTimeZone: string;
   events: EventWithLocation[];
   locations: Location[];
+  programs?: { id: string; name: string }[];
   canEdit: boolean;
 }) {
   const router = useRouter();
@@ -294,6 +296,7 @@ export function ScheduleClient({
         defaultStart={defaultRange?.start}
         defaultEnd={defaultRange?.end}
         locations={locations}
+        programs={programs}
         open={dialogOpen}
         onOpenChange={(v) => {
           setDialogOpen(v);

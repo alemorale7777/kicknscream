@@ -16,7 +16,7 @@ export default async function SchedulePage({ params }: { params: Promise<{ slug:
   const windowStart = subDays(new Date(), 35);
   const windowEnd = addDays(new Date(), 90);
 
-  const [events, locations] = await Promise.all([
+  const [events, locations, programs] = await Promise.all([
     db.event.findMany({
       where: {
         tenantId: tenant.id,
@@ -27,6 +27,11 @@ export default async function SchedulePage({ params }: { params: Promise<{ slug:
     }),
     db.location.findMany({
       where: { tenantId: tenant.id },
+      orderBy: { name: "asc" },
+    }),
+    db.program.findMany({
+      where: { tenantId: tenant.id, archived: false },
+      select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),
   ]);
@@ -41,6 +46,7 @@ export default async function SchedulePage({ params }: { params: Promise<{ slug:
         tenantTimeZone={tenant.timeZone ?? "America/Los_Angeles"}
         events={events}
         locations={locations}
+        programs={programs}
         canEdit={canEdit}
       />
     </div>

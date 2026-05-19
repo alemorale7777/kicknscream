@@ -56,6 +56,8 @@ import {
 } from "lucide-react";
 import type { AttendanceStatus, Event, EventType, Location } from "@prisma/client";
 
+type ProgramLite = { id: string; name: string };
+
 const eventTypeEnum = z.enum([
   "LESSON",
   "CLASS",
@@ -73,6 +75,8 @@ const schema = z.object({
   startTime: z.string().regex(/^\d{2}:\d{2}$/),
   endTime: z.string().regex(/^\d{2}:\d{2}$/),
   locationId: z.string().optional(),
+  programId: z.string().optional(),
+  description: z.string().max(2000).optional(),
   capacity: z.string().optional(),
   recurrenceEnabled: z.boolean(),
   recurrenceIntervalDays: z.string(),
@@ -111,6 +115,7 @@ export function EventDialog({
   defaultStart,
   defaultEnd,
   locations,
+  programs = [],
   open,
   onOpenChange,
 }: {
@@ -121,6 +126,7 @@ export function EventDialog({
   defaultStart?: Date;
   defaultEnd?: Date;
   locations: Location[];
+  programs?: ProgramLite[];
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
@@ -150,6 +156,10 @@ export function EventDialog({
       startTime: toTenantLocalIsoMinute(start, tenantTimeZone).slice(11, 16),
       endTime: toTenantLocalIsoMinute(end, tenantTimeZone).slice(11, 16),
       locationId: event?.locationId ?? "",
+      programId:
+        (event as { programId?: string | null } | undefined)?.programId ?? "",
+      description:
+        (event as { description?: string | null } | undefined)?.description ?? "",
       capacity: event?.capacity?.toString() ?? "",
       recurrenceEnabled: false,
       recurrenceIntervalDays: "7",
@@ -160,6 +170,7 @@ export function EventDialog({
   const type = useWatch({ control, name: "type" });
   const recurrenceEnabled = useWatch({ control, name: "recurrenceEnabled" });
   const locationIdValue = useWatch({ control, name: "locationId" });
+  const programIdValue = useWatch({ control, name: "programId" });
 
   function onSubmit(data: FormData) {
     // Editing a recurring occurrence — pause and ask whether to apply the
@@ -183,10 +194,11 @@ export function EventDialog({
             tenantId,
             type: data.type,
             title: data.title,
+            description: data.description?.trim() || null,
             startsAt,
             endsAt,
             locationId: data.locationId || null,
-            programId: null,
+            programId: data.programId || null,
             capacity: data.capacity ? Number(data.capacity) : null,
             scope,
           });
@@ -198,10 +210,11 @@ export function EventDialog({
             tenantId,
             type: data.type,
             title: data.title,
+            description: data.description?.trim() || null,
             startsAt,
             endsAt,
             locationId: data.locationId || null,
-            programId: null,
+            programId: data.programId || null,
             capacity: data.capacity ? Number(data.capacity) : null,
             recurrence:
               data.recurrenceEnabled && Number(data.recurrenceCount) > 1
@@ -353,6 +366,38 @@ export function EventDialog({
                 {...register("capacity")}
                 placeholder="Max players for this event"
                 className="font-mono"
+              />
+            </div>
+
+            {programs.length > 0 && (
+              <div className="space-y-1.5">
+                <Label>Service / program (optional)</Label>
+                <Select
+                  value={programIdValue ?? ""}
+                  onValueChange={(v) => setValue("programId", v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Link to a service" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {programs.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label htmlFor="description">Description (optional)</Label>
+              <textarea
+                id="description"
+                rows={3}
+                {...register("description")}
+                placeholder="Drills, focus areas, what to bring…"
+                className="w-full rounded-md border border-line bg-pitch-700 px-3 py-2 text-sm text-ink-50 placeholder:text-ink-700 focus:outline-none focus:border-turf-400/60"
               />
             </div>
 
