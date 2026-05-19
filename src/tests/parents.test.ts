@@ -31,6 +31,7 @@ import {
   restoreTenantAccess,
   attachUserToParent,
   findParentForUser,
+  mergeParents,
 } from "@/lib/parents";
 
 const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL! });
@@ -204,5 +205,56 @@ describe("attachUserToParent / findParentForUser", () => {
     await attachUserToParent(db, { parentId: parent.id, userId: user.id });
     const found = await findParentForUser(db, user.id);
     expect(found?.id).toBe(parent.id);
+  });
+});
+
+describe("mergeParents", () => {
+  it("moves players, dedupes TenantParent collisions, soft-deletes loser", async () => {
+    const winnerEmail = `winner-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`;
+    const loserEmail = `loser-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`;
+
+    const winner = await findOrCreateParent(db, {
+      tenantId: TENANT_ID,
+      email: winnerEmail,
+      name: "Winner",
+    });
+    const loser = await findOrCreateParent(db, {
+      tenantId: TENANT_ID,
+      email: loserEmail,
+      name: "Loser",
+    });
+
+    const player = await db.player.create({
+      data: {
+        tenantId: TENANT_ID,
+        firstName: "Kid",
+        lastName: "X",
+        dob: new Date("2015-01-01"),
+        parentRefId: loser.parent.id,
+      },
+    });
+
+    const result = await mergeParents(db, {
+      winnerId: winner.parent.id,
+      loserId: loser.parent.id,
+    });
+    expect(result.kidsMoved).toBe(1);
+    expect(result.tenantsCollapsed).toBe(1);
+
+    const refreshedPlayer = await db.player.findUnique({ where: { id: player.id } });
+    expect(refreshedPlayer?.parentRefId).toBe(winner.parent.id);
+
+    const refreshedLoser = await db.parent.findUnique({
+      where: { id: loser.parent.id },
+    });
+    expect(refreshedLoser?.deletedAt).not.toBeNull();
+    expect(refreshedLoser?.email).toContain("merged-");
+
+    const loserTp = await db.tenantParent.findUnique({
+      where: {
+        tenantId_parentId: { tenantId: TENANT_ID, parentId: loser.parent.id },
+      },
+    });
+    expect(loserTp).toBeNull();
   });
 });

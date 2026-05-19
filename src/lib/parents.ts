@@ -122,3 +122,113 @@ export async function findParentForUser(
 ): Promise<Parent | null> {
   return db.parent.findFirst({ where: { userId } });
 }
+
+export type MergeParentsResult = {
+  winnerId: string;
+  loserId: string;
+  kidsMoved: number;
+  parentPlayerRowsMoved: number;
+  tenantsCollapsed: number;
+};
+
+/**
+ * Collapse `loserId` into `winnerId`. Re-points every Player + ParentPlayer
+ * link, dedupes TenantParent collisions (keeps older registeredAt + appends
+ * notes), hoists userId if winner lacks one, and soft-deletes the loser.
+ *
+ * Wraps in a $transaction so partial failures roll back cleanly.
+ */
+export async function mergeParents(
+  db: PrismaClient,
+  args: { winnerId: string; loserId: string }
+): Promise<MergeParentsResult> {
+  if (args.winnerId === args.loserId) {
+    throw new Error("Cannot merge a parent into itself");
+  }
+  return db.$transaction(async (tx) => {
+    const [winner, loser] = await Promise.all([
+      tx.parent.findUniqueOrThrow({ where: { id: args.winnerId } }),
+      tx.parent.findUniqueOrThrow({ where: { id: args.loserId } }),
+    ]);
+
+    const playerUpdate = await tx.player.updateMany({
+      where: { parentRefId: loser.id },
+      data: { parentRefId: winner.id },
+    });
+
+    const ppUpdate = await tx.parentPlayer.updateMany({
+      where: { parentRefId: loser.id },
+      data: { parentRefId: winner.id },
+    });
+
+    const loserTps = await tx.tenantParent.findMany({
+      where: { parentId: loser.id },
+    });
+    let tenantsCollapsed = 0;
+    for (const loserTp of loserTps) {
+      const winnerTp = await tx.tenantParent.findUnique({
+        where: {
+          tenantId_parentId: { tenantId: loserTp.tenantId, parentId: winner.id },
+        },
+      });
+      if (winnerTp) {
+        const keepRegisteredAt =
+          loserTp.registeredAt < winnerTp.registeredAt
+            ? loserTp.registeredAt
+            : winnerTp.registeredAt;
+        const mergedNotes =
+          [winnerTp.notes, loserTp.notes].filter(Boolean).join("\n\n---\n\n") || null;
+        await tx.tenantParent.update({
+          where: {
+            tenantId_parentId: { tenantId: loserTp.tenantId, parentId: winner.id },
+          },
+          data: { registeredAt: keepRegisteredAt, notes: mergedNotes },
+        });
+        await tx.tenantParent.delete({
+          where: {
+            tenantId_parentId: { tenantId: loserTp.tenantId, parentId: loser.id },
+          },
+        });
+      } else {
+        await tx.tenantParent.update({
+          where: {
+            tenantId_parentId: { tenantId: loserTp.tenantId, parentId: loser.id },
+          },
+          data: { parentId: winner.id },
+        });
+      }
+      tenantsCollapsed++;
+    }
+
+    if (!winner.userId && loser.userId) {
+      // Loser must shed userId first because Parent.userId is @unique
+      await tx.parent.update({
+        where: { id: loser.id },
+        data: { userId: null },
+      });
+      await tx.parent.update({
+        where: { id: winner.id },
+        data: { userId: loser.userId },
+      });
+    }
+
+    await tx.parent.update({
+      where: { id: loser.id },
+      data: {
+        email: `merged-${loser.id}@kicknscream.local`,
+        name: null,
+        phone: null,
+        userId: null,
+        deletedAt: new Date(),
+      },
+    });
+
+    return {
+      winnerId: winner.id,
+      loserId: loser.id,
+      kidsMoved: playerUpdate.count,
+      parentPlayerRowsMoved: ppUpdate.count,
+      tenantsCollapsed,
+    };
+  });
+}
