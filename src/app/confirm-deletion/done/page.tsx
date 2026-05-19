@@ -6,7 +6,7 @@ export default function ConfirmDeletionDonePage() {
       <div className="max-w-md space-y-4 text-center">
         <h1 className="text-2xl font-bold">Account deleted</h1>
         <p className="text-ink-300">
-          Your KickNScream account is gone. Your name, email, phone, kids'
+          Your KickNScream account is gone. Your name, email, phone, kids&apos;
           names + photos, and any coach notes have been anonymized. A receipt
           has been sent to your original email address.
         </p>

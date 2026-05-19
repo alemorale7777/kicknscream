@@ -20,7 +20,7 @@ for (const file of [".env.local", ".env"]) {
   if (existsSync(full)) config({ path: full, override: false });
 }
 
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { PrismaNeon } from "@prisma/adapter-neon";
 import { emailHash, logAudit } from "../src/lib/audit";
 
@@ -35,12 +35,14 @@ const REDACT_KEYS = ["email", "parentEmail", "payerEmail"] as const;
 async function main() {
   console.log(`[redact-audit-history] mode=${APPLY ? "APPLY" : "DRY-RUN"}`);
 
+  // Prisma's JSON `not` filter rejects literal `null` in v7. Use Prisma.JsonNull
+  // (the sentinel for "field is not the JSON null value, and isn't absent").
   const rows = await prisma.auditLog.findMany({
     where: {
       OR: [
-        { diff: { path: ["email"], not: null } },
-        { diff: { path: ["parentEmail"], not: null } },
-        { diff: { path: ["payerEmail"], not: null } },
+        { diff: { path: ["email"], not: Prisma.JsonNull } },
+        { diff: { path: ["parentEmail"], not: Prisma.JsonNull } },
+        { diff: { path: ["payerEmail"], not: Prisma.JsonNull } },
       ],
     },
   });

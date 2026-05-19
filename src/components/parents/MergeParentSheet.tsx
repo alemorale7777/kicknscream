@@ -50,10 +50,7 @@ export function MergeParentSheet({
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
-    if (!q.trim()) {
-      setResults([]);
-      return;
-    }
+    if (!q.trim()) return;
     let cancelled = false;
     searchCandidates(q).then((r) => {
       if (!cancelled) setResults(r.filter((c) => c.id !== winnerId));
@@ -62,6 +59,9 @@ export function MergeParentSheet({
       cancelled = true;
     };
   }, [q, searchCandidates, winnerId]);
+
+  // Derive empty results when the query is cleared — no setState inside effect.
+  const visibleResults = q.trim() ? results : [];
 
   function runMerge() {
     if (!selectedLoser) return;
@@ -99,7 +99,7 @@ export function MergeParentSheet({
             autoFocus
           />
           <ul className="divide-y divide-line">
-            {results.map((c) => (
+            {visibleResults.map((c) => (
               <li key={c.id}>
                 <button
                   type="button"

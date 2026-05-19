@@ -7,7 +7,7 @@ export default function ConfirmDeletionExpiredPage() {
         <h1 className="text-2xl font-bold">Link expired</h1>
         <p className="text-ink-300">
           That deletion confirmation link has expired or has already been used.
-          If you still want to delete your account, ask any tenant you're
+          If you still want to delete your account, ask any tenant you&apos;re
           registered with to send a fresh request.
         </p>
         <Link href="/" className="text-turf-300 hover:text-turf-200 underline">
