@@ -98,7 +98,14 @@ export async function logAudit(input: {
  * hash. Investigators can rehash a known email and search for matches.
  */
 export function emailHash(email: string): string {
-  return createHmac("sha256", env.AUDIT_EMAIL_HMAC_SECRET)
+  const secret = env.AUDIT_EMAIL_HMAC_SECRET;
+  if (!secret) {
+    throw new Error(
+      "AUDIT_EMAIL_HMAC_SECRET is not set. Set it on Vercel " +
+        "(production + preview + development) — generate with `openssl rand -hex 32`."
+    );
+  }
+  return createHmac("sha256", secret)
     .update(email.trim().toLowerCase())
     .digest("hex")
     .slice(0, 16);

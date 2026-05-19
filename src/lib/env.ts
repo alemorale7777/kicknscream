@@ -26,7 +26,12 @@ const envSchema = z.object({
   VERCEL_PROJECT_ID: z.string().optional(),
   VERCEL_TEAM_ID: z.string().optional(),
   CRON_SECRET: z.string().optional(),
-  AUDIT_EMAIL_HMAC_SECRET: z.string().min(32, "Must be at least 32 chars"),
+  // Optional at boot so a missing var doesn't 500 every route. Point-of-use
+  // (emailHash) throws a clear error if it tries to read this without it set.
+  AUDIT_EMAIL_HMAC_SECRET: z
+    .string()
+    .min(32, "Must be at least 32 chars")
+    .optional(),
   NEXT_PUBLIC_PARENT_MODEL_V2: z.enum(["false", "shadow", "true"]).default("false"),
   PARENT_MODEL_V2_TENANT_OVERRIDE: z.string().optional(),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
