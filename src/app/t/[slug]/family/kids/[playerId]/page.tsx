@@ -40,7 +40,13 @@ export default async function FamilyKidPage({
       playerId: player.id,
       status: { in: ["ACTIVE", "CONFIRMED", "PAID", "PENDING"] },
     },
-    select: { programId: true },
+    select: {
+      programId: true,
+      packBalance: true,
+      program: {
+        select: { id: true, name: true, priceModel: true, packSize: true },
+      },
+    },
   });
   const programIds = Array.from(new Set(enrollments.map((e) => e.programId)));
 
@@ -107,6 +113,46 @@ export default async function FamilyKidPage({
           )}
         </CardContent>
       </Card>
+
+      {(() => {
+        const activePacks = enrollments.filter(
+          (e) =>
+            e.program?.priceModel === "PACKAGE" &&
+            e.program.packSize &&
+            e.packBalance !== null
+        );
+        if (activePacks.length === 0) return null;
+        return (
+          <section className="space-y-2">
+            <h2 className="text-sm uppercase tracking-[0.2em] text-ink-500">
+              Sessions remaining
+            </h2>
+            <div className="space-y-2">
+              {activePacks.map((e) => {
+                const balance = e.packBalance ?? 0;
+                const size = e.program!.packSize!;
+                const pct = (balance / size) * 100;
+                return (
+                  <Card key={e.programId} className="p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="font-medium text-ink-50">{e.program!.name}</p>
+                      <span className="font-mono text-sm text-turf-300">
+                        {balance} of {size} left
+                      </span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-pitch-700 overflow-hidden">
+                      <div
+                        className="h-full bg-turf-400 transition-all"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          </section>
+        );
+      })()}
 
       <section className="space-y-2">
         <h2 className="text-sm uppercase tracking-[0.2em] text-ink-500">Upcoming sessions</h2>
