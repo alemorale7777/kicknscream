@@ -12,6 +12,7 @@ import { EVENT_TONE } from "@/lib/eventTone";
 import { format, addDays } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import { formatEventShort } from "@/lib/datetime";
+import { isPubliclyBookable } from "@/lib/programs";
 import {
   MapPin,
   Calendar,
@@ -95,7 +96,7 @@ export default async function PublicTenantPage({
   const tenant = await db.tenant.findUnique({ where: { slug } });
   if (!tenant) notFound();
 
-  const [upcomingEvents, locations, programs] = await Promise.all([
+  const [upcomingEvents, locations, programsRaw] = await Promise.all([
     db.event.findMany({
       where: {
         tenantId: tenant.id,
@@ -107,10 +108,24 @@ export default async function PublicTenantPage({
     }),
     db.location.findMany({ where: { tenantId: tenant.id }, orderBy: { name: "asc" } }),
     db.program.findMany({
-      where: { tenantId: tenant.id, archived: false },
+      where: {
+        tenantId: tenant.id,
+        archived: false,
+        // Recurring services without a Stripe price attached are not
+        // bookable — they'd render publicly as $0/per month even though
+        // the coach UI flags them "Recurring price pending". Hide them.
+        OR: [
+          { priceModel: { not: "MONTHLY" } },
+          { priceModel: "MONTHLY", stripePriceId: { not: null } },
+        ],
+      },
       orderBy: [{ priceModel: "asc" }, { price: "asc" }],
     }),
   ]);
+  // Defense in depth — the query filter handles MONTHLY-without-price,
+  // but pass everything through the shared predicate so future fields
+  // (e.g. published flag) only need a single touch point.
+  const programs = programsRaw.filter(isPubliclyBookable);
 
   const copy = TYPE_COPY[tenant.type];
   const tone = TONE_CLASSES[copy.tone];
