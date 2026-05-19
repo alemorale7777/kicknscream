@@ -61,6 +61,17 @@ export default async function PlayerProfilePage({
     ? await db.user.findUnique({ where: { id: player.parentId } })
     : null;
 
+  // Pull guardian links (Parent rows) so the profile surfaces co-parents / grandparents
+  // alongside the primary parent that lives on Player.parentRefId.
+  const playerParents = await db.parentPlayer.findMany({
+    where: { playerId: player.id, parentRefId: { not: null } },
+    include: { parentRef: true },
+  });
+
+  const primaryParent = player.parentRefId
+    ? await db.parent.findUnique({ where: { id: player.parentRefId } })
+    : null;
+
   // Pull session notes tagged to this player so the Notes tab merges
   // event-scoped notes (visible to parent + AI-assisted) with the
   // coach-only DevelopmentNote stream.
@@ -289,6 +300,48 @@ export default async function PlayerProfilePage({
               )}
             </CardContent>
           </Card>
+
+          {(playerParents.length > 0 || primaryParent) && (
+            <Card className="px-6 py-5">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-ink-500 mb-3">
+                Parents
+              </p>
+              <ul className="divide-y divide-line">
+                {primaryParent && (
+                  <li className="py-2.5">
+                    <Link
+                      href={`/t/${tenant.slug}/coach/parents/${primaryParent.id}`}
+                      prefetch={false}
+                      className="flex items-center gap-2 hover:bg-pitch-800/40 -mx-2 px-2 rounded"
+                    >
+                      <span className="font-medium text-ink-50">
+                        {primaryParent.name ?? primaryParent.email}
+                      </span>
+                      <span className="text-xs text-ink-500">(primary)</span>
+                    </Link>
+                  </li>
+                )}
+                {playerParents.map(
+                  (pp) =>
+                    pp.parentRef &&
+                    pp.parentRef.id !== primaryParent?.id && (
+                      <li key={pp.parentRef.id} className="py-2.5">
+                        <Link
+                          href={`/t/${tenant.slug}/coach/parents/${pp.parentRef.id}`}
+                          prefetch={false}
+                          className="flex items-center gap-2 hover:bg-pitch-800/40 -mx-2 px-2 rounded"
+                        >
+                          <span className="font-medium text-ink-50">
+                            {pp.parentRef.name ?? pp.parentRef.email}
+                          </span>
+                          <span className="text-xs text-ink-500">({pp.relationship})</span>
+                        </Link>
+                      </li>
+                    )
+                )}
+              </ul>
+            </Card>
+          )}
           </div>
         )}
 

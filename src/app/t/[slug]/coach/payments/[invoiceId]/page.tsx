@@ -47,6 +47,25 @@ export default async function InvoiceDetailPage({
   });
   if (!invoice || invoice.tenantId !== tenant.id) notFound();
 
+  // Surface the payer Parent record so coaches can pivot from an invoice
+  // straight into the parent's detail page. We look it up via the first
+  // enrollment's player; multi-player invoices share the same payer in
+  // practice (BookingDraft → invoice creates one Invoice per payer email).
+  const firstEnrollment = invoice.enrollments[0];
+  let payerParent: { id: string; name: string | null; email: string } | null = null;
+  if (firstEnrollment) {
+    const enrollPlayer = await db.player.findUnique({
+      where: { id: firstEnrollment.playerId },
+      select: { parentRefId: true },
+    });
+    if (enrollPlayer?.parentRefId) {
+      payerParent = await db.parent.findUnique({
+        where: { id: enrollPlayer.parentRefId },
+        select: { id: true, name: true, email: true },
+      });
+    }
+  }
+
   const effectiveStatus = invoiceDisplayStatus(invoice);
   const tone = STATUS_TONE[effectiveStatus];
   const Icon = tone.icon;
@@ -97,7 +116,17 @@ export default async function InvoiceDetailPage({
           <div className="space-y-2">
             <div>
               <p className="text-[10px] uppercase tracking-wider text-ink-500">Payer</p>
-              <p className="font-medium text-ink-50">{invoice.payerEmail}</p>
+              {payerParent ? (
+                <Link
+                  href={`/t/${slug}/coach/parents/${payerParent.id}`}
+                  prefetch={false}
+                  className="font-medium text-ink-50 hover:text-turf-300"
+                >
+                  {payerParent.name ?? payerParent.email}
+                </Link>
+              ) : (
+                <p className="font-medium text-ink-50">{invoice.payerEmail}</p>
+              )}
             </div>
             <div>
               <p className="text-[10px] uppercase tracking-wider text-ink-500">Created</p>
