@@ -158,7 +158,7 @@ export async function createBookingAction(input: BookingInput) {
   });
 
   // Create enrollment linking player → program → invoice
-  await db.enrollment.create({
+  const enrollment = await db.enrollment.create({
     data: {
       playerId: player.id,
       programId: program.id,
@@ -166,6 +166,20 @@ export async function createBookingAction(input: BookingInput) {
       status: program.priceModel === "FREE" ? "ACTIVE" : "PENDING",
     },
   });
+
+  // PACKAGE programs seed the remaining-sessions counter from the
+  // program's packSize. Attendance writes decrement this; hitting 0
+  // auto-completes the enrollment.
+  if (
+    program.priceModel === "PACKAGE" &&
+    program.packSize &&
+    program.packSize > 0
+  ) {
+    await db.enrollment.update({
+      where: { id: enrollment.id },
+      data: { packBalance: program.packSize },
+    });
+  }
 
   // Create the actual scheduled event
   const event = await db.event.create({
