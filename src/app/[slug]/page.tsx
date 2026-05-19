@@ -9,7 +9,7 @@ import { ChalkGrid, Floodlight } from "@/components/brand/ChalkGrid";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { ServiceCatalog } from "@/components/book/ServiceCatalog";
 import { EVENT_TONE } from "@/lib/eventTone";
-import { format, addDays } from "date-fns";
+import { addDays } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import { formatEventShort } from "@/lib/datetime";
 import { isPubliclyBookable } from "@/lib/programs";
