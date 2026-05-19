@@ -340,3 +340,108 @@ function inlineFormat(s: string): string {
     .replace(/\*(.+?)\*/g, "<em>$1</em>")
     .replace(/`(.+?)`/g, '<code style="background:rgba(255,255,255,0.08);padding:2px 4px;border-radius:3px;font-family:ui-monospace,monospace;">$1</code>');
 }
+
+export async function sendRefundConfirmation(opts: {
+  to: string;
+  parentName: string;
+  tenantName: string;
+  tenantSlug: string;
+  programName: string | null;
+  amountCents: number;
+  fullRefund: boolean;
+  reason: string | null;
+}) {
+  const resend = new Resend(env.AUTH_RESEND_KEY);
+  const amountLabel = formatCents(opts.amountCents);
+  const reasonLine = opts.reason
+    ? `<p style="margin:0 0 12px;color:#94A39B;font-size:13px;">Reason on record: <span style="color:#C4CDC7;">${escapeHtml(opts.reason)}</span></p>`
+    : "";
+  const html = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Refund issued</title></head>
+<body style="margin:0;padding:0;background:#050A07;font-family:-apple-system,system-ui,sans-serif;color:#F5F7F4;">
+  <div style="max-width:560px;margin:0 auto;padding:32px 24px;">
+    <div style="margin-bottom:32px;">
+      <span style="font-size:22px;font-weight:800;letter-spacing:-0.04em;color:#F5F7F4;">KICK<span style="color:#1FB663;">N</span>SCREAM</span>
+      <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#E8FF3C;margin-left:6px;vertical-align:middle;"></span>
+    </div>
+    <div style="background:#0F1C17;border:1px solid rgba(255,255,255,0.14);border-radius:12px;padding:32px;">
+      <p style="margin:0 0 8px;color:#94A39B;font-size:12px;text-transform:uppercase;letter-spacing:0.12em;">Refund issued</p>
+      <h1 style="margin:0 0 16px;font-size:24px;font-weight:700;letter-spacing:-0.02em;color:#F5F7F4;">${amountLabel} refunded</h1>
+      <p style="margin:0 0 12px;color:#C4CDC7;line-height:1.6;">Hi ${escapeHtml(opts.parentName.split(" ")[0])},</p>
+      <p style="margin:0 0 16px;color:#C4CDC7;line-height:1.6;">
+        ${escapeHtml(opts.tenantName)} just refunded ${amountLabel}${opts.programName ? ` from ${escapeHtml(opts.programName)}` : ""}.
+        ${opts.fullRefund ? "The invoice is voided in full." : "This is a partial refund — the rest of the invoice stays paid."}
+      </p>
+      <p style="margin:0 0 12px;color:#C4CDC7;line-height:1.6;font-size:13px;">
+        The money is on its way back to the card or account you originally paid with.
+        Most banks show it in 5–10 business days; some show it the next day.
+      </p>
+      ${reasonLine}
+      <p style="margin:16px 0 0;color:#94A39B;font-size:12px;line-height:1.6;">
+        Questions about the refund? Reply to this email and ${escapeHtml(opts.tenantName)} will help.
+      </p>
+    </div>
+    <p style="margin:20px 0 0;color:#5A6A62;font-size:12px;text-align:center;">Powered by KickNScream</p>
+  </div>
+</body></html>`;
+
+  const text = `${opts.tenantName} refunded ${amountLabel}${opts.programName ? ` from ${opts.programName}` : ""}.\n${
+    opts.fullRefund ? "The invoice is voided in full." : "Partial refund — the rest of the invoice stays paid."
+  }\nMost banks show it in 5–10 business days.\n${opts.reason ? `Reason on record: ${opts.reason}` : ""}`;
+
+  await resend.emails.send({
+    from: env.EMAIL_FROM,
+    to: opts.to,
+    subject: `Refund issued · ${opts.tenantName}`,
+    html,
+    text,
+  });
+}
+
+export async function sendPackCompletedEmail(opts: {
+  to: string;
+  parentName: string;
+  tenantName: string;
+  tenantSlug: string;
+  programName: string;
+  programId: string;
+  packSize: number;
+}) {
+  const resend = new Resend(env.AUTH_RESEND_KEY);
+  const bookHref = `${env.NEXTAUTH_URL}/${opts.tenantSlug}/book/${opts.programId}`;
+  const html = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Your pack is finished</title></head>
+<body style="margin:0;padding:0;background:#050A07;font-family:-apple-system,system-ui,sans-serif;color:#F5F7F4;">
+  <div style="max-width:560px;margin:0 auto;padding:32px 24px;">
+    <div style="margin-bottom:32px;">
+      <span style="font-size:22px;font-weight:800;letter-spacing:-0.04em;color:#F5F7F4;">KICK<span style="color:#1FB663;">N</span>SCREAM</span>
+      <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#E8FF3C;margin-left:6px;vertical-align:middle;"></span>
+    </div>
+    <div style="background:#0F1C17;border:1px solid rgba(255,255,255,0.14);border-radius:12px;padding:32px;">
+      <p style="margin:0 0 8px;color:#94A39B;font-size:12px;text-transform:uppercase;letter-spacing:0.12em;">All ${opts.packSize} sessions used</p>
+      <h1 style="margin:0 0 16px;font-size:24px;font-weight:700;letter-spacing:-0.02em;color:#F5F7F4;">${escapeHtml(opts.programName)}</h1>
+      <p style="margin:0 0 12px;color:#C4CDC7;line-height:1.6;">Hi ${escapeHtml(opts.parentName.split(" ")[0])},</p>
+      <p style="margin:0 0 16px;color:#C4CDC7;line-height:1.6;">
+        You've used the last session in your ${opts.packSize}-pack with ${escapeHtml(opts.tenantName)}.
+        Nice work showing up — that's the whole game.
+      </p>
+      <p style="margin:16px 0 0;">
+        <a href="${escapeHtml(bookHref)}" style="display:inline-block;background:#1FB663;color:#050A07;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600;">
+          Buy another pack →
+        </a>
+      </p>
+    </div>
+    <p style="margin:20px 0 0;color:#5A6A62;font-size:12px;text-align:center;">Powered by KickNScream</p>
+  </div>
+</body></html>`;
+
+  const text = `You've used the last session in your ${opts.packSize}-pack of ${opts.programName} with ${opts.tenantName}.\nBuy another: ${bookHref}`;
+
+  await resend.emails.send({
+    from: env.EMAIL_FROM,
+    to: opts.to,
+    subject: `Your ${opts.programName} pack is finished`,
+    html,
+    text,
+  });
+}
