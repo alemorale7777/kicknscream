@@ -12,7 +12,7 @@ import { fromTenantLocalIsoMinute } from "@/lib/datetime";
 import { findOrCreateParent, issueClaimToken } from "@/lib/parents";
 import { formatInTimeZone } from "date-fns-tz";
 import { addDays } from "date-fns";
-import { logAudit } from "@/lib/audit";
+import { emailHash, logAudit } from "@/lib/audit";
 import type { EventType } from "@prisma/client";
 
 const bookingSchema = z.object({
@@ -84,8 +84,20 @@ export async function createBookingAction(input: BookingInput) {
       phone: data.parentPhone ?? null,
     });
     parentRefId = result.parent.id;
+    if (result.created) {
+      await logAudit({
+        tenantId: tenant.id,
+        actorUserId: null,
+        action: "parent.create",
+        targetType: "parent",
+        targetId: result.parent.id,
+        diff: { source: "booking", emailHash: emailHash(parentEmail) },
+      });
+    }
     // If a User row already exists for this email (e.g., prior staff invite),
-    // attach it so cross-tenant continuity works from booking #1.
+    // attach it so cross-tenant continuity works from booking #1. This is
+    // data wiring, not an active claim — claimedAt stays null until the
+    // parent actually consumes a /claim/[token] link.
     if (!result.parent.userId) {
       const existingUser = await db.user.findUnique({
         where: { email: parentEmail },

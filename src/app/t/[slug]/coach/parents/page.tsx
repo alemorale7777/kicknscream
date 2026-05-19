@@ -14,6 +14,7 @@ type ParentRow = {
     name: string | null;
     phone: string | null;
     userId: string | null;
+    claimedAt: Date | null;
     deletedAt: Date | null;
   };
   playerCount: number;
@@ -40,6 +41,7 @@ export default async function ParentsPage({
           name: true,
           phone: true,
           userId: true,
+          claimedAt: true,
           deletedAt: true,
         },
       },
@@ -87,7 +89,7 @@ export default async function ParentsPage({
     })
   );
 
-  const unclaimedCount = rows.filter((r) => !r.parent.userId).length;
+  const unclaimedCount = rows.filter((r) => !r.parent.claimedAt).length;
   const outstandingCount = rows.filter((r) => r.outstandingCents > 0).length;
 
   return (

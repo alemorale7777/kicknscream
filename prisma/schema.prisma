@@ -698,6 +698,12 @@ model Parent {
   pendingDeletionRequestedBy String?
   claimToken              String?   @unique
   claimTokenExpiresAt     DateTime?
+  // Set only when the parent actively claims via /claim/[token]. userId alone
+  // is NOT proof of claim — backfilled + booking-auto-linked parents inherit
+  // userId from the legacy User by-email match. The UI's CLAIMED badge keys
+  // off this column, not userId, so legacy + auto-linked parents correctly
+  // show UNCLAIMED until they actually consume a magic link.
+  claimedAt               DateTime?
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 

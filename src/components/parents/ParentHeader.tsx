@@ -44,7 +44,7 @@ export function ParentHeader({
             <Badge variant="outline" className="border-warn/40 text-warn">Revoked</Badge>
           ) : p.deletedAt ? (
             <Badge variant="outline" className="border-line text-ink-500">Deleted</Badge>
-          ) : p.userId ? (
+          ) : p.claimedAt ? (
             <Badge variant="outline" className="border-turf-400/40 text-turf-300">Claimed</Badge>
           ) : (
             <Badge variant="outline" className="border-flood-400/40 text-flood-400">Unclaimed</Badge>

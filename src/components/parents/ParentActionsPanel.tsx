@@ -17,10 +17,11 @@ import type { Parent, TenantParent } from "@prisma/client";
 /**
  * Buttons row at the bottom of the parent detail page — Edit / Merge /
  * Revoke-or-Restore / Send-Claim. The send-claim button is suppressed when
- * the parent already has a `userId` (account is already attached). The
- * revoke <-> restore toggle keys off the current TenantParent.status; the
- * destructive coloring flips so the affordance always advertises the next
- * action, not the current state.
+ * the parent has already actively claimed (claimedAt is set) — having a
+ * userId alone is NOT enough since backfilled + booking-auto-linked rows
+ * inherit userId without consent. The revoke <-> restore toggle keys off
+ * the current TenantParent.status; destructive coloring flips so the
+ * affordance always advertises the next action, not the current state.
  */
 export function ParentActionsPanel({
   tenantId,
@@ -79,7 +80,7 @@ export function ParentActionsPanel({
         Actions
       </p>
       <div className="flex flex-wrap gap-2">
-        {!parent.userId && (
+        {!parent.claimedAt && (
           <Button
             variant="outline"
             size="sm"

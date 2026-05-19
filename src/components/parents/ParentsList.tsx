@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -18,6 +19,7 @@ export type ParentsListRow = {
     name: string | null;
     phone: string | null;
     userId: string | null;
+    claimedAt: Date | null;
     deletedAt: Date | null;
   };
   playerCount: number;
@@ -26,7 +28,14 @@ export type ParentsListRow = {
   outstandingCents: number;
 };
 
-type Filter = "all" | "claimed" | "unclaimed" | "outstanding" | "revoked";
+const FILTERS = ["all", "claimed", "unclaimed", "outstanding", "revoked"] as const;
+type Filter = (typeof FILTERS)[number];
+
+function parseFilter(value: string | null): Filter {
+  return (FILTERS as readonly string[]).includes(value ?? "")
+    ? (value as Filter)
+    : "all";
+}
 
 export function ParentsList({
   tenantSlug,
@@ -37,14 +46,29 @@ export function ParentsList({
   tenantTimeZone: string;
   rows: ParentsListRow[];
 }) {
-  const [q, setQ] = useState("");
-  const [filter, setFilter] = useState<Filter>("all");
+  const searchParams = useSearchParams();
+  // Initial state seeded from the URL so refresh / share / back-button preserve
+  // the view. Subsequent changes write back via history.replaceState so we
+  // don't trigger a full Next.js server roundtrip on every keystroke.
+  const [q, setQ] = useState(() => searchParams.get("q") ?? "");
+  const [filter, setFilter] = useState<Filter>(() =>
+    parseFilter(searchParams.get("status"))
+  );
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (q.trim()) url.searchParams.set("q", q.trim());
+    else url.searchParams.delete("q");
+    if (filter !== "all") url.searchParams.set("status", filter);
+    else url.searchParams.delete("status");
+    window.history.replaceState(null, "", url.toString());
+  }, [q, filter]);
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return rows.filter((r) => {
-      if (filter === "claimed" && !r.parent.userId) return false;
-      if (filter === "unclaimed" && r.parent.userId) return false;
+      if (filter === "claimed" && !r.parent.claimedAt) return false;
+      if (filter === "unclaimed" && r.parent.claimedAt) return false;
       if (filter === "outstanding" && r.outstandingCents === 0) return false;
       if (filter === "revoked" && r.status !== "REVOKED") return false;
       if (!needle) return true;
@@ -68,7 +92,7 @@ export function ParentsList({
           />
         </div>
         <div className="flex gap-1 flex-wrap">
-          {(["all", "claimed", "unclaimed", "outstanding", "revoked"] as const).map((f) => (
+          {FILTERS.map((f) => (
             <button
               key={f}
               type="button"
@@ -128,7 +152,7 @@ export function ParentsList({
                         Revoked
                       </Badge>
                     )}
-                    {!r.parent.userId && r.status === "ACTIVE" && (
+                    {!r.parent.claimedAt && r.status === "ACTIVE" && (
                       <Badge variant="outline" className="border-flood-400/40 text-flood-400">
                         Unclaimed
                       </Badge>

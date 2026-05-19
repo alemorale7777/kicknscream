@@ -53,8 +53,11 @@ export async function getTenantBySlug(slug: string): Promise<Tenant | null> {
 /**
  * Resolve current tenant + user + membership.
  * - Tenant not found → notFound()
- * - Not authed → redirect to sign-in
- * - Authed but not a member → notFound() (privacy: don't leak tenant existence)
+ * - Not authed → redirect to sign-in (callback rebounds to /t/[slug])
+ * - Authed but not a member → redirect to /t/[slug]/no-access (KNS-29).
+ *   Anonymous traffic still gets 404 above; only authenticated visitors
+ *   see the friendly "no access" page so we don't leak tenant existence
+ *   to crawlers.
  */
 export async function requireTenant(slug: string) {
   const tenant = await getTenantBySlug(slug);
@@ -67,7 +70,7 @@ export async function requireTenant(slug: string) {
   if (!user) redirect(`/auth/signin?callbackUrl=/t/${slug}`);
 
   const membership = user.memberships.find((m) => m.tenantId === tenant.id);
-  if (!membership) notFound();
+  if (!membership) redirect(`/t/${slug}/no-access`);
 
   return { tenant, user, membership };
 }

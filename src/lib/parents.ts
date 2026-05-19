@@ -282,6 +282,8 @@ export async function consumeClaimToken(
       userId: args.userId,
       claimToken: null,
       claimTokenExpiresAt: null,
+      // Stamp the active-consent moment. The UI's CLAIMED badge keys off this.
+      claimedAt: new Date(),
     },
   });
   return { parent: updated };

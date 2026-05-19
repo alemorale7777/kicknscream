@@ -210,7 +210,7 @@ export async function sendParentClaimEmailAction(
   const { user } = await assertCanManage(data.tenantId);
   const tenant = await db.tenant.findUniqueOrThrow({ where: { id: data.tenantId } });
   const parent = await db.parent.findUniqueOrThrow({ where: { id: data.parentId } });
-  if (parent.userId) {
+  if (parent.claimedAt) {
     throw new Error("Parent has already claimed their account");
   }
   const token = await issueClaimToken(db, parent.id);
