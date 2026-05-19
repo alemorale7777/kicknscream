@@ -24,6 +24,9 @@ const ACTION_LABELS: Record<string, string> = {
   "team.invite": "Teammate invited",
   "team.role_change": "Role changed",
   "data.export": "Data exported",
+  "payment.refund": "Refund issued",
+  "enrollment.pack_consumed": "Pack session used",
+  "enrollment.pack_completed": "Pack finished",
 };
 
 function labelFor(action: string): string {

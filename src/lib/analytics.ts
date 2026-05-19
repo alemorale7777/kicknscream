@@ -25,7 +25,10 @@ export type AnalyticsEvent =
   | "waiver_signed"
   | "calendar_subscribed"
   | "team_invited"
-  | "stripe_connect_started";
+  | "stripe_connect_started"
+  | "refund_issued"
+  | "pack_completed"
+  | "billing_portal_opened";
 
 type Properties = Record<string, string | number | boolean | null | undefined>;
 
