@@ -2,9 +2,34 @@ import { cache } from "react";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import type { Tenant } from "@prisma/client";
+import type { Membership, Parent, Tenant, TenantParent, User } from "@prisma/client";
 
 export { hasRole, canManageTenant, roleLabel } from "./roles";
+
+export type TenantAccessStaff = {
+  kind: "staff";
+  tenant: Tenant;
+  user: User;
+  membership: Membership;
+};
+
+export type TenantAccessParent = {
+  kind: "parent";
+  tenant: Tenant;
+  user: User;
+  parent: Parent;
+  tenantParent: TenantParent;
+};
+
+export type TenantAccessAnonymous = {
+  kind: "anonymous";
+  tenant: Tenant;
+};
+
+export type TenantAccess =
+  | TenantAccessStaff
+  | TenantAccessParent
+  | TenantAccessAnonymous;
 
 /**
  * Tenant context helpers — every /t/[slug]/* layout uses requireTenant().
@@ -44,5 +69,38 @@ export async function requireTenant(slug: string) {
   if (!membership) notFound();
 
   return { tenant, user, membership };
+}
+
+/**
+ * Family-portal gate. Returns ACTIVE-only parent access OR redirects to a
+ * forbidden page if the user has no Parent attached / no TenantParent row at
+ * this tenant. REVOKED TenantParent rows fail.
+ *
+ * TODO: /t/[slug]/forbidden route may not exist yet — Task 14 will add it,
+ * or Next will fall through to a generic 404 (graceful).
+ */
+export async function requireParentAccess(slug: string): Promise<TenantAccessParent> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    redirect(`/auth/signin?callbackUrl=/t/${slug}/family/home`);
+  }
+  const tenant = await db.tenant.findUnique({ where: { slug } });
+  if (!tenant) notFound();
+  const user = await db.user.findUniqueOrThrow({
+    where: { id: session.user.id },
+  });
+  const parent = await db.parent.findFirst({
+    where: { userId: user.id },
+  });
+  if (!parent) {
+    redirect(`/t/${slug}/forbidden`);
+  }
+  const tenantParent = await db.tenantParent.findUnique({
+    where: { tenantId_parentId: { tenantId: tenant.id, parentId: parent.id } },
+  });
+  if (!tenantParent || tenantParent.status !== "ACTIVE") {
+    redirect(`/t/${slug}/forbidden`);
+  }
+  return { kind: "parent", tenant, user, parent, tenantParent };
 }
 
