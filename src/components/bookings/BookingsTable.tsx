@@ -57,6 +57,9 @@ export type BookingRow = {
   parentEmail: string | null;
   eventId: string | null;
   eventStart: string | null; // ISO
+  packBalance: number | null;
+  packSize: number | null;
+  priceModel: string | null;
 };
 
 export function BookingsTable({
@@ -155,6 +158,31 @@ export function BookingsTable({
               )}
             >
               {meta.label}
+            </span>
+          );
+        },
+      },
+      {
+        id: "pack",
+        header: "Pack",
+        cell: ({ row }) => {
+          const r = row.original;
+          if (r.priceModel !== "PACKAGE" || r.packSize == null) {
+            return <span className="text-ink-700 text-xs">—</span>;
+          }
+          const balance = r.packBalance ?? r.packSize;
+          const pct = balance / r.packSize;
+          const tone =
+            balance === 0
+              ? "text-ink-500 border-line bg-pitch-700"
+              : pct < 0.5
+                ? "text-warn border-warn/30 bg-warn/5"
+                : "text-turf-300 border-turf-400/30 bg-turf-400/5";
+          return (
+            <span
+              className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-mono ${tone}`}
+            >
+              {balance}/{r.packSize}
             </span>
           );
         },

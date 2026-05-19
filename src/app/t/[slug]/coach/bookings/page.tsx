@@ -64,6 +64,9 @@ export default async function BookingsPage({ params }: { params: Promise<{ slug:
       parentEmail: e.player.parentId ? parentEmailById.get(e.player.parentId) ?? null : null,
       eventId: ev?.id ?? null,
       eventStart: ev?.startsAt.toISOString() ?? null,
+      packBalance: e.packBalance,
+      packSize: e.program.packSize,
+      priceModel: e.program.priceModel,
     };
   });
 
