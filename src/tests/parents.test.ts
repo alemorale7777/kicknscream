@@ -25,7 +25,11 @@ if (existsSync(envLocal)) {
 import { describe, expect, it, beforeEach } from "vitest";
 import { PrismaClient } from "@prisma/client";
 import { PrismaNeon } from "@prisma/adapter-neon";
-import { findOrCreateParent } from "@/lib/parents";
+import {
+  findOrCreateParent,
+  revokeTenantAccess,
+  restoreTenantAccess,
+} from "@/lib/parents";
 
 const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL! });
 const db = new PrismaClient({ adapter });
@@ -113,5 +117,51 @@ describe("findOrCreateParent", () => {
     expect(b.created).toBe(false);
     expect(b.tenantParent.tenantId).toBe(other.id);
     expect(b.tenantParent.parentId).toBe(a.parent.id);
+  });
+});
+
+describe("revokeTenantAccess / restoreTenantAccess", () => {
+  it("sets status to REVOKED and stamps revokedAt", async () => {
+    const { parent } = await findOrCreateParent(db, {
+      tenantId: TENANT_ID,
+      email: `r-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`,
+    });
+    await revokeTenantAccess(db, { tenantId: TENANT_ID, parentId: parent.id });
+    const tp = await db.tenantParent.findUnique({
+      where: { tenantId_parentId: { tenantId: TENANT_ID, parentId: parent.id } },
+    });
+    expect(tp?.status).toBe("REVOKED");
+    expect(tp?.revokedAt).toBeInstanceOf(Date);
+  });
+
+  it("restore reverses revoke and clears revokedAt", async () => {
+    const { parent } = await findOrCreateParent(db, {
+      tenantId: TENANT_ID,
+      email: `r2-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`,
+    });
+    await revokeTenantAccess(db, { tenantId: TENANT_ID, parentId: parent.id });
+    await restoreTenantAccess(db, { tenantId: TENANT_ID, parentId: parent.id });
+    const tp = await db.tenantParent.findUnique({
+      where: { tenantId_parentId: { tenantId: TENANT_ID, parentId: parent.id } },
+    });
+    expect(tp?.status).toBe("ACTIVE");
+    expect(tp?.revokedAt).toBeNull();
+  });
+
+  it("does not touch other tenants' rows", async () => {
+    const other = await db.tenant.create({
+      data: { slug: `t-iso-${Date.now()}-${Math.random().toString(36).slice(2)}`, name: "ISO", type: "COACH" },
+    });
+    const email = `iso-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`;
+    const { parent } = await findOrCreateParent(db, {
+      tenantId: TENANT_ID,
+      email,
+    });
+    await findOrCreateParent(db, { tenantId: other.id, email });
+    await revokeTenantAccess(db, { tenantId: TENANT_ID, parentId: parent.id });
+    const otherTp = await db.tenantParent.findUnique({
+      where: { tenantId_parentId: { tenantId: other.id, parentId: parent.id } },
+    });
+    expect(otherTp?.status).toBe("ACTIVE");
   });
 });

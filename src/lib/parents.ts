@@ -60,3 +60,36 @@ export async function findOrCreateParent(
   });
   return { parent, tenantParent, created };
 }
+
+/**
+ * Revoke a parent's access at a single tenant. Sets status=REVOKED and
+ * stamps revokedAt. Scoped to one (tenantId, parentId) row — does not
+ * touch the parent's links at other tenants.
+ */
+export async function revokeTenantAccess(
+  db: Db,
+  args: { tenantId: string; parentId: string }
+): Promise<void> {
+  await db.tenantParent.update({
+    where: {
+      tenantId_parentId: { tenantId: args.tenantId, parentId: args.parentId },
+    },
+    data: { status: "REVOKED", revokedAt: new Date() },
+  });
+}
+
+/**
+ * Reverse a prior revoke: set status back to ACTIVE and clear revokedAt.
+ * Scoped to the single (tenantId, parentId) row.
+ */
+export async function restoreTenantAccess(
+  db: Db,
+  args: { tenantId: string; parentId: string }
+): Promise<void> {
+  await db.tenantParent.update({
+    where: {
+      tenantId_parentId: { tenantId: args.tenantId, parentId: args.parentId },
+    },
+    data: { status: "ACTIVE", revokedAt: null },
+  });
+}
