@@ -7,6 +7,9 @@ import { ParentStatsStrip } from "@/components/parents/ParentStatsStrip";
 import { ParentKidsCard } from "@/components/parents/ParentKidsCard";
 import { ParentBookingsCard } from "@/components/parents/ParentBookingsCard";
 import { ParentInvoicesCard } from "@/components/parents/ParentInvoicesCard";
+import { ParentActionsPanel } from "@/components/parents/ParentActionsPanel";
+import { ParentDangerZone } from "@/components/parents/ParentDangerZone";
+import { ParentNotesEditor } from "@/components/parents/ParentNotesEditor";
 import { ArrowLeft } from "lucide-react";
 
 export const metadata = { title: "Parent" };
@@ -50,6 +53,8 @@ export default async function ParentDetailPage({
     orderBy: { createdAt: "desc" },
   });
 
+  const tenantCount = await db.tenantParent.count({ where: { parentId } });
+
   return (
     <div className="max-w-4xl space-y-6">
       <Link
@@ -69,6 +74,50 @@ export default async function ParentDetailPage({
       <ParentKidsCard players={players} tenantSlug={slug} tenantTimeZone={tz} />
       <ParentBookingsCard enrollments={enrollments} tenantSlug={slug} tenantTimeZone={tz} />
       <ParentInvoicesCard invoices={invoices} tenantSlug={slug} tenantTimeZone={tz} />
+      <ParentNotesEditor
+        tenantId={tenant.id}
+        parentId={parentId}
+        initialNotes={tenantParent.notes}
+      />
+      <ParentActionsPanel
+        tenantId={tenant.id}
+        parent={tenantParent.parent}
+        tenantParent={tenantParent}
+        tenantCount={tenantCount}
+        searchMergeCandidates={async (q: string) => {
+          "use server";
+          // Tenant-scoped duplicate search: only return Parent rows that
+          // already have a TenantParent at this tenant — never leak global
+          // parents from other tenants. Closure over `tenant.id` is the
+          // intended Next.js 16 pattern for inline server actions on RSC.
+          const tps = await db.tenantParent.findMany({
+            where: {
+              tenantId: tenant.id,
+              parent: {
+                OR: [
+                  { email: { contains: q, mode: "insensitive" } },
+                  { name: { contains: q, mode: "insensitive" } },
+                ],
+              },
+            },
+            include: {
+              parent: { select: { id: true, email: true, name: true } },
+            },
+            take: 10,
+          });
+          return Promise.all(
+            tps.map(async (tp) => ({
+              id: tp.parent.id,
+              email: tp.parent.email,
+              name: tp.parent.name,
+              playerCount: await db.player.count({
+                where: { tenantId: tenant.id, parentRefId: tp.parent.id },
+              }),
+            }))
+          );
+        }}
+      />
+      <ParentDangerZone tenantId={tenant.id} parent={tenantParent.parent} />
     </div>
   );
 }
