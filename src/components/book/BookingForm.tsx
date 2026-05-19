@@ -13,6 +13,7 @@ import { createBookingAction } from "@/actions/booking";
 import { formatCents } from "@/lib/utils";
 import { addDays, format } from "date-fns";
 import { Loader2, ArrowRight, Calendar, Clock, CreditCard } from "lucide-react";
+import { SaveForLaterLink } from "./SaveForLaterLink";
 import type { Program } from "@prisma/client";
 
 const schema = z.object({
@@ -73,10 +74,12 @@ export function BookingForm({
   tenantSlug,
   program,
   busyStartsAt = [],
+  initialState,
 }: {
   tenantSlug: string;
   program: Program;
   busyStartsAt?: BusyEvent[];
+  initialState?: Record<string, unknown>;
 }) {
   const [pending, startTransition] = useTransition();
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
@@ -88,12 +91,14 @@ export function BookingForm({
     handleSubmit,
     control,
     setValue,
+    getValues,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
       date: minDate,
       startTime: "10:00",
+      ...(initialState as Partial<FormData> | undefined),
     },
   });
 
@@ -286,6 +291,32 @@ export function BookingForm({
           />
         </div>
       </Card>
+
+      {/* Save-for-later link — above the submit footer so it doesn't compete
+          for the primary action; visible whenever the parent has entered
+          enough to recover. */}
+      <div className="flex justify-end">
+        <SaveForLaterLink
+          tenantSlug={tenantSlug}
+          programId={program.id}
+          getDraftPayload={() => {
+            const values = getValues();
+            const startsAt =
+              values.date && values.startTime
+                ? new Date(`${values.date}T${values.startTime}:00`).toISOString()
+                : null;
+            const endsAt = startsAt
+              ? new Date(new Date(startsAt).getTime() + 60 * 60 * 1000).toISOString()
+              : null;
+            return {
+              email: values.parentEmail ?? null,
+              startsAt,
+              endsAt,
+              payload: values as unknown as Record<string, unknown>,
+            };
+          }}
+        />
+      </div>
 
       {/* Submit */}
       <div className="sticky bottom-4 z-10">
