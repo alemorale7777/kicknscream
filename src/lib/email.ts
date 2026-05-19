@@ -1,6 +1,8 @@
 import { Resend } from "resend";
 import { env } from "./env";
-import { format } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
+
+const DEFAULT_TZ = "America/Los_Angeles";
 
 function escapeHtml(s: string) {
   return s
@@ -25,10 +27,12 @@ export async function sendBookingConfirmation(opts: {
   endsAt: Date;
   amountCents: number;
   pendingPayment?: boolean;
+  timeZone?: string;
 }) {
   const resend = new Resend(env.AUTH_RESEND_KEY);
-  const dateLine = format(opts.startsAt, "EEEE, MMMM d");
-  const timeLine = `${format(opts.startsAt, "h:mm a")} – ${format(opts.endsAt, "h:mm a")}`;
+  const tz = opts.timeZone ?? DEFAULT_TZ;
+  const dateLine = formatInTimeZone(opts.startsAt, tz, "EEEE, MMMM d");
+  const timeLine = `${formatInTimeZone(opts.startsAt, tz, "h:mm a")} – ${formatInTimeZone(opts.endsAt, tz, "h:mm a")}`;
 
   const statusBlock = opts.pendingPayment
     ? `<div style="border:1px solid rgba(255,179,71,0.4);background:rgba(255,179,71,0.1);color:#FFB347;border-radius:8px;padding:14px;margin:16px 0;font-size:13px;">
@@ -107,9 +111,11 @@ export async function sendSessionNoteEmail(opts: {
   eventTitle: string;
   eventDate: Date;
   content: string;
+  timeZone?: string;
 }) {
   const resend = new Resend(env.AUTH_RESEND_KEY);
-  const dateLine = format(opts.eventDate, "EEEE, MMMM d · h:mm a");
+  const tz = opts.timeZone ?? DEFAULT_TZ;
+  const dateLine = formatInTimeZone(opts.eventDate, tz, "EEEE, MMMM d · h:mm a");
   const renderedContent = renderMarkdownToInlineHtml(opts.content);
 
   const html = `<!DOCTYPE html>
@@ -201,12 +207,14 @@ export async function sendBookingReminderEmail(opts: {
   endsAt: Date;
   locationName?: string | null;
   lead: "24h" | "2h";
+  timeZone?: string;
 }) {
   const resend = new Resend(env.AUTH_RESEND_KEY);
+  const tz = opts.timeZone ?? DEFAULT_TZ;
   const greetingName = opts.parentName ? opts.parentName.split(" ")[0] : null;
   const leadCopy = opts.lead === "24h" ? "Tomorrow" : "In 2 hours";
-  const dateLine = format(opts.startsAt, "EEEE, MMMM d");
-  const timeLine = `${format(opts.startsAt, "h:mm a")} – ${format(opts.endsAt, "h:mm a")}`;
+  const dateLine = formatInTimeZone(opts.startsAt, tz, "EEEE, MMMM d");
+  const timeLine = `${formatInTimeZone(opts.startsAt, tz, "h:mm a")} – ${formatInTimeZone(opts.endsAt, tz, "h:mm a")}`;
 
   const html = `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><title>Reminder: ${escapeHtml(opts.programName)}</title></head>
@@ -454,9 +462,11 @@ export async function sendResumeBookingEmail(opts: {
   programName: string;
   startsAt: Date;
   resumeUrl: string;
+  timeZone?: string;
 }) {
   const resend = new Resend(env.AUTH_RESEND_KEY);
-  const dateLine = format(opts.startsAt, "EEEE, MMMM d · h:mm a");
+  const tz = opts.timeZone ?? DEFAULT_TZ;
+  const dateLine = formatInTimeZone(opts.startsAt, tz, "EEEE, MMMM d · h:mm a");
   const html = `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><title>Pick up where you left off</title></head>
 <body style="margin:0;padding:0;background:#050A07;font-family:-apple-system,system-ui,sans-serif;color:#F5F7F4;">
@@ -510,8 +520,10 @@ export async function sendFamilyDigestEmail(opts: {
   tenantName: string;
   tenantSlug: string;
   kids: DigestKid[];
+  timeZone?: string;
 }) {
   const resend = new Resend(env.AUTH_RESEND_KEY);
+  const tz = opts.timeZone ?? DEFAULT_TZ;
   const kidBlocks = opts.kids
     .map(
       (k) => `
@@ -529,7 +541,7 @@ export async function sendFamilyDigestEmail(opts: {
       }
       ${
         k.nextSession
-          ? `<p style="margin:0 0 8px;color:#C4CDC7;font-size:14px;">⏭️ Next: ${escapeHtml(k.nextSession.title)} · ${format(k.nextSession.startsAt, "EEE, MMM d · h:mm a")}</p>`
+          ? `<p style="margin:0 0 8px;color:#C4CDC7;font-size:14px;">⏭️ Next: ${escapeHtml(k.nextSession.title)} · ${formatInTimeZone(k.nextSession.startsAt, tz, "EEE, MMM d · h:mm a")}</p>`
           : ""
       }
       ${

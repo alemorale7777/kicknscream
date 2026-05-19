@@ -109,29 +109,29 @@ export function NotificationPreferencesForm({ initial }: { initial: Prefs }) {
       <ChannelGroup
         icon={Phone}
         label="SMS"
-        description="Text-message notifications. Coming soon — opt in here and we'll wire your number to the next release."
-        muted={!prefs.smsOptIn}
+        description="Text-message notifications are in private beta. Opt in now to be queued for access — email reminders cover the same events today."
+        muted
       >
         <PrefRow
           label="Opt in to text messages"
-          hint="Carrier rates apply. You can opt back out any time."
+          hint="We'll email you once SMS is available for your account."
           enabled={prefs.smsOptIn}
           onToggle={() => toggle("smsOptIn")}
           pending={pending && pendingKey === "smsOptIn"}
         />
         <PrefRow
           label="Booking reminders"
-          enabled={prefs.smsReminders}
-          onToggle={() => toggle("smsReminders")}
-          disabled={!prefs.smsOptIn}
-          pending={pending && pendingKey === "smsReminders"}
+          enabled={false}
+          onToggle={() => {}}
+          disabled
+          pending={false}
         />
         <PrefRow
           label="Payment events"
-          enabled={prefs.smsPayments}
-          onToggle={() => toggle("smsPayments")}
-          disabled={!prefs.smsOptIn}
-          pending={pending && pendingKey === "smsPayments"}
+          enabled={false}
+          onToggle={() => {}}
+          disabled
+          pending={false}
         />
       </ChannelGroup>
     </div>

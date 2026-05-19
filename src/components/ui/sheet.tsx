@@ -23,6 +23,12 @@ const SheetOverlay = React.forwardRef<
 ));
 SheetOverlay.displayName = "SheetOverlay";
 
+// Escape and outside-click dismissal are delegated to Radix defaults —
+// {...props} below forwards onEscapeKeyDown / onPointerDownOutside if a
+// consumer ever needs to override, but Sheet's <Root open onOpenChange/>
+// API is enough for dismiss to fire onOpenChange(false). Do not add a
+// preventDefault here without a clear reason; an audit reported dismiss
+// was broken but the wrapper was correct — likely a stale runtime.
 const SheetContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>

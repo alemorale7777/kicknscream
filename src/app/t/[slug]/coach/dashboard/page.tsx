@@ -134,10 +134,17 @@ async function renderOperatorDashboard(
       orderBy: { createdAt: "desc" },
       include: { player: true, program: true },
     }),
+    // KNS-08: "Overdue" is *derived* from dueAt < now() (and not PAID/VOIDED)
+    // — the on-disk status enum stays SENT/PARTIAL/PAID/VOIDED so historical
+    // rows keep working. Status "OVERDUE" is a display-only label.
     db.invoice.findMany({
-      where: { tenantId: tenant.id, status: "OVERDUE" },
+      where: {
+        tenantId: tenant.id,
+        status: { in: ["SENT", "PARTIAL"] },
+        dueAt: { lt: new Date() },
+      },
       take: 5,
-      orderBy: { createdAt: "asc" },
+      orderBy: { dueAt: "asc" },
     }),
   ]);
 

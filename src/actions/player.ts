@@ -6,12 +6,16 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/tenant";
 import { canManageTenant } from "@/lib/roles";
 import { generateInvitationToken, getInvitationUrl, sendInvitationEmail } from "@/lib/invitations";
+import { logAudit } from "@/lib/audit";
 
 const createPlayerSchema = z.object({
   tenantId: z.string(),
   firstName: z.string().min(1).max(60),
   lastName: z.string().min(1).max(60),
-  dob: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date of birth must be YYYY-MM-DD"),
+  dob: z
+    .string()
+    .min(1, "Pick a date of birth")
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a date of birth"),
   position: z.string().max(40).optional(),
   jerseyNumber: z
     .union([z.string(), z.number()])
@@ -82,7 +86,7 @@ export async function createPlayerAction(input: z.infer<typeof createPlayerSchem
     }
   }
 
-  await db.player.create({
+  const created = await db.player.create({
     data: {
       tenantId: data.tenantId,
       firstName: data.firstName,
@@ -92,6 +96,20 @@ export async function createPlayerAction(input: z.infer<typeof createPlayerSchem
       position: data.position || null,
       jerseyNumber: data.jerseyNumber ?? null,
       notes: data.notes || null,
+    },
+  });
+
+  await logAudit({
+    tenantId: data.tenantId,
+    actorUserId: user.id,
+    action: "roster.player_add",
+    targetType: "player",
+    targetId: created.id,
+    diff: {
+      firstName: data.firstName,
+      lastName: data.lastName,
+      parentLinked: !!parentId,
+      parentInvited,
     },
   });
 

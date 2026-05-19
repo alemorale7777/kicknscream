@@ -67,7 +67,9 @@ export function WorkspaceSwitcher({
           <Shield className="h-2.5 w-2.5" />
           {roleLabel(current.role)}
         </span>
-        <ChevronsUpDown className="h-3.5 w-3.5 text-ink-500 group-hover:text-ink-300" />
+        {/* KNS-18: bump caret contrast so the pill reads as interactive,
+            not as a status badge. */}
+        <ChevronsUpDown className="h-4 w-4 text-ink-300 group-hover:text-ink-50 transition-colors" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-80">
         <DropdownMenuLabel className="flex items-center justify-between">

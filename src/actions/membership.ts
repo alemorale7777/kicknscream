@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/tenant";
 import { canManageTenant } from "@/lib/roles";
 import { generateInvitationToken, getInvitationUrl, sendInvitationEmail } from "@/lib/invitations";
+import { logAudit } from "@/lib/audit";
 
 const inviteSchema = z.object({
   tenantId: z.string(),
@@ -67,6 +68,14 @@ export async function inviteMemberAction(input: z.infer<typeof inviteSchema>) {
     inviterName: user.name ?? user.email ?? "A teammate",
     role: data.role,
     acceptUrl: getInvitationUrl(token),
+  });
+
+  await logAudit({
+    tenantId: tenant.id,
+    actorUserId: user.id,
+    action: "team.member_invite",
+    targetType: "invitation",
+    diff: { email: normalizedEmail, role: data.role },
   });
 
   revalidatePath(`/t/${tenant.slug}/coach/settings/team`);
@@ -195,6 +204,14 @@ export async function removeMemberAction(tenantId: string, userId: string) {
     throw new Error("The OWNER cannot be removed");
   }
   await db.membership.delete({ where: { userId_tenantId: { userId, tenantId } } });
+  await logAudit({
+    tenantId,
+    actorUserId: actor.id,
+    action: "team.member_remove",
+    targetType: "membership",
+    targetId: userId,
+    diff: { removedUserId: userId, previousRole: targetMembership.role },
+  });
   const tenant = await db.tenant.findUnique({ where: { id: tenantId } });
   if (tenant) revalidatePath(`/t/${tenant.slug}/coach/settings/team`);
 }

@@ -3,14 +3,13 @@
 import { useMemo, useOptimistic, useRef, useState, useTransition } from "react";
 import { EVENT_TONE, toneChipStyle } from "@/lib/eventTone";
 import { cn } from "@/lib/utils";
+import { formatEventTime } from "@/lib/datetime";
+import { formatInTimeZone } from "date-fns-tz";
 import {
   addDays,
-  differenceInMinutes,
   endOfWeek,
   format,
-  isSameDay,
   isToday,
-  startOfDay,
   startOfWeek,
 } from "date-fns";
 import {
@@ -35,6 +34,7 @@ type EventWithLocation = Event & { location?: Location | null };
 
 export function WeekView({
   tenantId,
+  tenantTimeZone,
   anchorDate,
   events,
   canEdit,
@@ -42,6 +42,7 @@ export function WeekView({
   onEventClick,
 }: {
   tenantId: string;
+  tenantTimeZone: string;
   anchorDate: Date;
   events: EventWithLocation[];
   locations?: Location[];
@@ -68,18 +69,21 @@ export function WeekView({
   );
   const [, startTransition] = useTransition();
 
+  const dayKey = (d: Date) => formatInTimeZone(d, tenantTimeZone, "yyyy-MM-dd");
+
   const eventsByDay = useMemo(() => {
     const map = new Map<string, EventWithLocation[]>();
     for (const day of days) {
-      map.set(day.toDateString(), []);
+      map.set(dayKey(day), []);
     }
     for (const e of optimisticEvents) {
-      const dayKey = startOfDay(e.startsAt).toDateString();
-      if (!map.has(dayKey)) continue;
-      map.get(dayKey)!.push(e);
+      const key = dayKey(e.startsAt);
+      if (!map.has(key)) continue;
+      map.get(key)!.push(e);
     }
     return map;
-  }, [optimisticEvents, days]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [optimisticEvents, days, tenantTimeZone]);
 
   const gridRef = useRef<HTMLDivElement>(null);
   const [hoverCell, setHoverCell] = useState<{ dayIdx: number; hour: number } | null>(null);
@@ -136,8 +140,8 @@ export function WeekView({
         });
         const dayLabel =
           dayShift === 0
-            ? format(newStart, "h:mm a")
-            : `${format(newStart, "EEE")} ${format(newStart, "h:mm a")}`;
+            ? formatEventTime(newStart, tenantTimeZone)
+            : formatInTimeZone(newStart, tenantTimeZone, "EEE h:mm a");
         toast.success(`Moved to ${dayLabel}`);
       } catch (err) {
         toast.error((err as Error).message);
@@ -218,7 +222,7 @@ export function WeekView({
         {/* Day columns */}
         {days.map((day, dayIdx) => {
           const isCurrentDay = isToday(day);
-          const dayEvents = eventsByDay.get(day.toDateString()) ?? [];
+          const dayEvents = eventsByDay.get(dayKey(day)) ?? [];
           return (
             <div
               key={day.toISOString()}
@@ -255,13 +259,14 @@ export function WeekView({
                   key={event.id}
                   event={event}
                   day={day}
+                  tenantTimeZone={tenantTimeZone}
                   canEdit={canEdit}
                   onClick={() => onEventClick(event)}
                 />
               ))}
 
               {/* Current time indicator */}
-              {isCurrentDay && <NowMarker />}
+              {isCurrentDay && <NowMarker tenantTimeZone={tenantTimeZone} />}
             </div>
           );
         })}
@@ -285,11 +290,13 @@ export function WeekView({
 function EventBlock({
   event,
   day,
+  tenantTimeZone,
   canEdit,
   onClick,
 }: {
   event: Event & { location?: Location | null };
   day: Date;
+  tenantTimeZone: string;
   canEdit: boolean;
   onClick: () => void;
 }) {
@@ -301,20 +308,31 @@ function EventBlock({
   const start = new Date(event.startsAt);
   const end = new Date(event.endsAt);
 
-  // Cap to visible range
-  const visibleStart = new Date(day);
-  visibleStart.setHours(DAY_START_HOUR, 0, 0, 0);
-  const visibleEnd = new Date(day);
-  visibleEnd.setHours(DAY_END_HOUR + 1, 0, 0, 0);
+  // Anchor render math in the tenant's timezone so server and client
+  // agree, and so the event sits at the right vertical offset regardless
+  // of the viewer's browser timezone.
+  const dayKey = formatInTimeZone(day, tenantTimeZone, "yyyy-MM-dd");
+  const eventDayKey = formatInTimeZone(start, tenantTimeZone, "yyyy-MM-dd");
+  const minutesIntoTenantDay = (instant: Date): number => {
+    const [h, m] = formatInTimeZone(instant, tenantTimeZone, "HH:mm")
+      .split(":")
+      .map(Number);
+    return h * 60 + m;
+  };
+  const VISIBLE_START_MIN = DAY_START_HOUR * 60;
+  const VISIBLE_END_MIN = (DAY_END_HOUR + 1) * 60;
+  const eventStartMin = minutesIntoTenantDay(start);
+  const eventEndMin =
+    eventDayKey === formatInTimeZone(end, tenantTimeZone, "yyyy-MM-dd")
+      ? minutesIntoTenantDay(end)
+      : 24 * 60;
 
-  const startClipped = start < visibleStart ? visibleStart : start;
-  const endClipped = end > visibleEnd ? visibleEnd : end;
+  const topMin = Math.max(0, eventStartMin - VISIBLE_START_MIN);
+  const clampedEndMin = Math.min(eventEndMin, VISIBLE_END_MIN);
+  const heightMin = Math.max(20, clampedEndMin - Math.max(eventStartMin, VISIBLE_START_MIN));
 
-  const topMin = differenceInMinutes(startClipped, visibleStart);
-  const heightMin = Math.max(20, differenceInMinutes(endClipped, startClipped));
-
-  // Only render if this event actually overlaps with `day` between DAY_START and DAY_END
-  if (!isSameDay(start, day) || endClipped <= visibleStart) return null;
+  // Only render if this event lives on `day` (tenant-local) and overlaps the visible band
+  if (eventDayKey !== dayKey || clampedEndMin <= VISIBLE_START_MIN) return null;
 
   const top = (topMin / 60) * HOUR_HEIGHT;
   const height = (heightMin / 60) * HOUR_HEIGHT - 2;
@@ -357,9 +375,9 @@ function EventBlock({
       {...attributes}
     >
       <div className="flex items-center gap-1 text-[10px] font-mono tracking-tight opacity-90 leading-none mb-0.5">
-        {format(start, "h:mm")}
+        {formatInTimeZone(start, tenantTimeZone, "h:mm")}
         <span className="opacity-50">→</span>
-        {format(end, "h:mm a")}
+        {formatEventTime(end, tenantTimeZone)}
       </div>
       <div className="font-semibold text-xs leading-tight line-clamp-2">{event.title}</div>
       {event.location && height > 50 && (
@@ -369,14 +387,12 @@ function EventBlock({
   );
 }
 
-function NowMarker() {
+function NowMarker({ tenantTimeZone }: { tenantTimeZone: string }) {
   const now = new Date();
-  const day = startOfDay(now);
-  const visibleStart = new Date(day);
-  visibleStart.setHours(DAY_START_HOUR, 0, 0, 0);
-  const minutesFromStart = differenceInMinutes(now, visibleStart);
+  const [h, m] = formatInTimeZone(now, tenantTimeZone, "HH:mm").split(":").map(Number);
+  const minutesFromStart = h * 60 + m - DAY_START_HOUR * 60;
   if (minutesFromStart < 0) return null;
-  if (now.getHours() > DAY_END_HOUR) return null;
+  if (h > DAY_END_HOUR) return null;
   const top = (minutesFromStart / 60) * HOUR_HEIGHT;
   return (
     <div

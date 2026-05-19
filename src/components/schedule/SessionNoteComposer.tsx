@@ -32,12 +32,19 @@ export function SessionNoteComposer({
   players,
   programName,
   eventTitle,
+  aiEnabled = false,
 }: {
   tenantId: string;
   eventId: string;
   players: PlayerLite[];
   programName?: string;
   eventTitle?: string;
+  /**
+   * Whether the AI session-note polish feature is enabled on this server.
+   * False when ANTHROPIC_API_KEY is unset — in that case we hide the AI
+   * polish button entirely instead of failing on click with a toast.
+   */
+  aiEnabled?: boolean;
 }) {
   // Radix Select forbids empty-string values — use a sentinel for the
   // "no player" option and translate to null when submitting.
@@ -201,27 +208,29 @@ Supports **bold**, *italic*, and bullet lists with - dashes."
             {s.split("\n")[0].slice(0, 26)}…
           </button>
         ))}
-        <div className="ml-auto">
-          <button
-            type="button"
-            onClick={runAiAssist}
-            disabled={aiPending || pending || content.trim().length < 3}
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-semibold transition-all duration-[120ms]",
-              "bg-flood-400/15 text-flood-400 border border-flood-400/40",
-              "hover:bg-flood-400/25 hover:border-flood-400/70",
-              "disabled:opacity-40 disabled:cursor-not-allowed"
-            )}
-            title="Turn your bullets into a parent-ready note"
-          >
-            {aiPending ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            ) : (
-              <Wand2 className="h-3 w-3" />
-            )}
-            {aiPending ? "Drafting…" : "AI polish"}
-          </button>
-        </div>
+        {aiEnabled && (
+          <div className="ml-auto">
+            <button
+              type="button"
+              onClick={runAiAssist}
+              disabled={aiPending || pending || content.trim().length < 3}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-semibold transition-all duration-[120ms]",
+                "bg-flood-400/15 text-flood-400 border border-flood-400/40",
+                "hover:bg-flood-400/25 hover:border-flood-400/70",
+                "disabled:opacity-40 disabled:cursor-not-allowed"
+              )}
+              title="Turn your bullets into a parent-ready note"
+            >
+              {aiPending ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Wand2 className="h-3 w-3" />
+              )}
+              {aiPending ? "Drafting…" : "AI polish"}
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 items-end pt-3 border-t border-line">

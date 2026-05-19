@@ -9,7 +9,10 @@ import { ChalkGrid, Floodlight } from "@/components/brand/ChalkGrid";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { ServiceCatalog } from "@/components/book/ServiceCatalog";
 import { EVENT_TONE } from "@/lib/eventTone";
-import { format, addDays } from "date-fns";
+import { addDays } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
+import { formatEventShort } from "@/lib/datetime";
+import { isPubliclyBookable } from "@/lib/programs";
 import {
   MapPin,
   Calendar,
@@ -93,7 +96,7 @@ export default async function PublicTenantPage({
   const tenant = await db.tenant.findUnique({ where: { slug } });
   if (!tenant) notFound();
 
-  const [upcomingEvents, locations, programs] = await Promise.all([
+  const [upcomingEvents, locations, programsRaw] = await Promise.all([
     db.event.findMany({
       where: {
         tenantId: tenant.id,
@@ -105,10 +108,24 @@ export default async function PublicTenantPage({
     }),
     db.location.findMany({ where: { tenantId: tenant.id }, orderBy: { name: "asc" } }),
     db.program.findMany({
-      where: { tenantId: tenant.id, archived: false },
+      where: {
+        tenantId: tenant.id,
+        archived: false,
+        // Recurring services without a Stripe price attached are not
+        // bookable — they'd render publicly as $0/per month even though
+        // the coach UI flags them "Recurring price pending". Hide them.
+        OR: [
+          { priceModel: { not: "MONTHLY" } },
+          { priceModel: "MONTHLY", stripePriceId: { not: null } },
+        ],
+      },
       orderBy: [{ priceModel: "asc" }, { price: "asc" }],
     }),
   ]);
+  // Defense in depth — the query filter handles MONTHLY-without-price,
+  // but pass everything through the shared predicate so future fields
+  // (e.g. published flag) only need a single touch point.
+  const programs = programsRaw.filter(isPubliclyBookable);
 
   const copy = TYPE_COPY[tenant.type];
   const tone = TONE_CLASSES[copy.tone];
@@ -213,7 +230,10 @@ export default async function PublicTenantPage({
           <Wordmark size="sm" />
         </Link>
         <Button variant="ghost" size="sm" asChild>
-          <Link href="/auth/signin">Sign in</Link>
+          {/* Default sign-in destination is THIS tenant's coach dashboard
+              when the visitor is a coach/admin, or the family home for a
+              parent. NextAuth honors callbackUrl after auth. */}
+          <Link href={`/auth/signin?callbackUrl=/t/${tenant.slug}/coach/dashboard`}>Sign in</Link>
         </Button>
       </header>
 
@@ -349,8 +369,8 @@ export default async function PublicTenantPage({
                   className="p-4 flex items-center gap-4 hover:border-turf-400/40 transition-colors"
                 >
                   <div className="text-center w-14 shrink-0 border-r border-line pr-3 font-mono">
-                    <p className="text-[10px] uppercase tracking-wider text-ink-500">{format(e.startsAt, "MMM")}</p>
-                    <p className="text-2xl font-bold leading-none mt-0.5">{format(e.startsAt, "d")}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-ink-500">{formatInTimeZone(e.startsAt, tenant.timeZone ?? "America/Los_Angeles", "MMM")}</p>
+                    <p className="text-2xl font-bold leading-none mt-0.5">{formatInTimeZone(e.startsAt, tenant.timeZone ?? "America/Los_Angeles", "d")}</p>
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -365,7 +385,7 @@ export default async function PublicTenantPage({
                     <div className="flex items-center gap-3 text-xs text-ink-500 mt-1">
                       <span className="inline-flex items-center gap-1">
                         <Clock className="h-3 w-3" />
-                        {format(e.startsAt, "EEE h:mm a")}
+                        {formatEventShort(e.startsAt, tenant.timeZone ?? "America/Los_Angeles")}
                       </span>
                       {e.location && (
                         <span className="inline-flex items-center gap-1">
@@ -401,7 +421,7 @@ export default async function PublicTenantPage({
                 <Link href={`/auth/signin?callbackUrl=/t/${tenant.slug}/coach/dashboard`}>{copy.cta}</Link>
               </Button>
               <Button variant="outline" size="lg" asChild>
-                <Link href="/auth/signin">Sign in</Link>
+                <Link href={`/auth/signin?callbackUrl=/t/${tenant.slug}/coach/dashboard`}>Sign in</Link>
               </Button>
             </div>
           </div>

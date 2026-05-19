@@ -10,7 +10,8 @@ import { Button } from "@/components/ui/button";
 import { SessionNoteComposer } from "@/components/schedule/SessionNoteComposer";
 import { SessionNoteList } from "@/components/schedule/SessionNoteList";
 import { AttendanceList } from "@/components/schedule/AttendanceList";
-import { format } from "date-fns";
+import { formatEventDate, formatEventTime } from "@/lib/datetime";
+import { aiEnabled } from "@/lib/ai";
 import {
   Calendar,
   Clock,
@@ -139,11 +140,11 @@ export default async function EventDetailPage({
           <div className="flex flex-wrap items-center gap-4 mt-3 text-sm text-ink-300">
             <span className="inline-flex items-center gap-1.5">
               <Calendar className="h-4 w-4" />
-              {format(event.startsAt, "EEEE, MMMM d")}
+              {formatEventDate(event.startsAt, tenant.timeZone ?? "America/Los_Angeles")}
             </span>
             <span className="inline-flex items-center gap-1.5">
               <Clock className="h-4 w-4" />
-              {format(event.startsAt, "h:mm a")} – {format(event.endsAt, "h:mm a")}
+              {formatEventTime(event.startsAt, tenant.timeZone ?? "America/Los_Angeles")} – {formatEventTime(event.endsAt, tenant.timeZone ?? "America/Los_Angeles")}
             </span>
             {event.location && (
               <span className="inline-flex items-center gap-1.5">
@@ -203,6 +204,7 @@ export default async function EventDetailPage({
             players={playersForComposer}
             programName={event.program?.name ?? event.title}
             eventTitle={event.title}
+            aiEnabled={aiEnabled()}
           />
         )}
 

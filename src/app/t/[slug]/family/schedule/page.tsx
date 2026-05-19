@@ -2,7 +2,7 @@ import { requireTenant } from "@/lib/tenant";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import { format } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { Calendar, ArrowRight, MapPin } from "lucide-react";
 import { loadUpcomingFamilyEvents } from "@/lib/family/events";
 
@@ -17,6 +17,7 @@ export default async function FamilySchedulePage({
   const { tenant, user } = await requireTenant(slug);
 
   const rows = await loadUpcomingFamilyEvents(tenant.id, user.id);
+  const tz = tenant.timeZone ?? "America/Los_Angeles";
 
   return (
     <div className="space-y-6">
@@ -44,16 +45,16 @@ export default async function FamilySchedulePage({
             <Card key={event.id} className="p-3 flex items-center gap-3">
               <div className="text-center w-14 shrink-0 border-r border-line pr-3 font-mono">
                 <p className="text-[10px] uppercase tracking-wider text-ink-500">
-                  {format(event.startsAt, "MMM")}
+                  {formatInTimeZone(event.startsAt, tz, "MMM")}
                 </p>
                 <p className="text-xl font-bold leading-none mt-0.5">
-                  {format(event.startsAt, "d")}
+                  {formatInTimeZone(event.startsAt, tz, "d")}
                 </p>
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-ink-50 truncate">{event.title}</p>
                 <p className="text-xs text-ink-500 mt-0.5 inline-flex items-center gap-2 flex-wrap">
-                  <span>{format(event.startsAt, "EEE h:mm a")}</span>
+                  <span>{formatInTimeZone(event.startsAt, tz, "EEE h:mm a")}</span>
                   {event.location && (
                     <span className="inline-flex items-center gap-0.5">
                       <MapPin className="h-3 w-3" />

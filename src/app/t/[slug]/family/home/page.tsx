@@ -138,6 +138,7 @@ export default async function FamilyHomePage({
           <NextSessionHero
             key={player.id}
             tenantSlug={tenant.slug}
+            tenantTimeZone={tenant.timeZone ?? "America/Los_Angeles"}
             event={event}
             player={player}
             weather={heroWeather[i]}

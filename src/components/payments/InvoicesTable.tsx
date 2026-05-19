@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -24,7 +25,8 @@ import { RefundButton } from "./RefundButton";
 import { toast } from "sonner";
 import { sendBalanceReminderAction, voidInvoiceAction } from "@/actions/payment";
 import { formatCents, cn } from "@/lib/utils";
-import { format, isPast } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
+import { invoiceDisplayStatus } from "@/lib/invoiceStatus";
 import {
   Search,
   Banknote,
@@ -68,10 +70,14 @@ type Filter = "all" | "open" | "paid" | "voided";
 
 export function InvoicesTable({
   tenantId,
+  tenantSlug,
+  tenantTimeZone,
   invoices,
   canEdit,
 }: {
   tenantId: string;
+  tenantSlug: string;
+  tenantTimeZone: string;
   invoices: InvoiceWithPayments[];
   canEdit: boolean;
 }) {
@@ -168,26 +174,32 @@ export function InvoicesTable({
         ) : (
           <div className="space-y-2">
             {filtered.map((i) => {
-              const tone = STATUS_TONE[i.status];
               const owed = balance(i);
-              const overdue = i.status === "SENT" && isPast(i.createdAt);
-              const effectiveTone = overdue ? STATUS_TONE.OVERDUE : tone;
+              const effectiveStatus = invoiceDisplayStatus(i);
+              const effectiveTone = STATUS_TONE[effectiveStatus];
+              const overdue = effectiveStatus === "OVERDUE";
               const EffectiveIcon = effectiveTone.icon;
               const isPending = pendingId === i.id;
 
+              const detailHref = `/t/${tenantSlug}/coach/payments/${i.id}`;
               return (
                 <Card
                   key={i.id}
                   className={cn(
-                    "p-4 flex items-center gap-4 transition-colors",
+                    "p-4 flex items-center gap-4 transition-colors hover:bg-pitch-800/40",
                     i.status === "PAID" && "opacity-80",
                     overdue && "border-danger/30"
                   )}
                 >
-                  <div className="hidden sm:flex h-10 w-10 rounded-md bg-pitch-700 items-center justify-center shrink-0">
+                  <Link
+                    href={detailHref}
+                    prefetch={false}
+                    className="hidden sm:flex h-10 w-10 rounded-md bg-pitch-700 items-center justify-center shrink-0"
+                    aria-label={`Open invoice ${i.description ?? i.id}`}
+                  >
                     <EffectiveIcon className={cn("h-5 w-5", effectiveTone.tone)} />
-                  </div>
-                  <div className="flex-1 min-w-0">
+                  </Link>
+                  <Link href={detailHref} prefetch={false} className="flex-1 min-w-0 block">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold text-ink-50 truncate">{i.description ?? "Invoice"}</p>
                       <Badge
@@ -210,9 +222,9 @@ export function InvoicesTable({
                     <div className="flex items-center gap-3 text-xs text-ink-500 mt-1 flex-wrap">
                       <span>{i.payerEmail}</span>
                       <span className="text-ink-700">·</span>
-                      <span className="font-mono">{format(i.createdAt, "MMM d, yyyy")}</span>
+                      <span className="font-mono">{formatInTimeZone(i.createdAt, tenantTimeZone, "MMM d, yyyy")}</span>
                     </div>
-                  </div>
+                  </Link>
                   <div className="text-right shrink-0">
                     <p className="font-mono font-bold tabular-nums">{formatCents(i.amount)}</p>
                     {i.status !== "PAID" && i.status !== "VOIDED" && owed !== i.amount && (
@@ -222,7 +234,7 @@ export function InvoicesTable({
                     )}
                     {i.status === "PAID" && i.paidAt && (
                       <p className="text-[10px] uppercase tracking-wider text-turf-300">
-                        paid {format(i.paidAt, "MMM d")}
+                        paid {formatInTimeZone(i.paidAt, tenantTimeZone, "MMM d")}
                       </p>
                     )}
                   </div>

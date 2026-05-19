@@ -125,7 +125,7 @@ export default async function AdminPermissionsPage({
       <PageHeader
         eyebrow="Permissions"
         title="What each role can do"
-        description="Defaults shown here cover the typical SportsEngine-style tenant. Click any cell to override for this tenant — the change is logged in the audit log."
+        description="Defaults below match what most coaches and academies need on day one. Click any cell to override for this tenant — the change is logged in the audit log."
       />
       <PermissionMatrix
         tenantId={tenant.id}

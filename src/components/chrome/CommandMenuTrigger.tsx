@@ -122,7 +122,7 @@ export function CommandMenuTrigger({
         aria-label="Open command menu"
       >
         <Search className="h-3.5 w-3.5" />
-        <span>Search</span>
+        <span>Go to…</span>
         <span className="ml-2 inline-flex items-center gap-0.5 rounded border border-line bg-pitch-900 px-1 py-0.5 font-mono text-[10px] text-ink-500">
           <CommandIcon className="h-2.5 w-2.5" />K
         </span>
@@ -156,7 +156,7 @@ export function CommandMenuTrigger({
               <div className="flex items-center gap-2 border-b border-line px-3">
                 <Search className="h-4 w-4 text-ink-500 shrink-0" />
                 <Command.Input
-                  placeholder="Type a command or search…"
+                  placeholder="Go to a page…"
                   className="flex-1 bg-transparent py-3 text-sm text-ink-50 placeholder:text-ink-500 outline-none"
                   autoFocus
                 />

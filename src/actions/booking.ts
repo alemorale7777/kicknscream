@@ -7,6 +7,10 @@ import { env } from "@/lib/env";
 import { sendBookingConfirmation } from "@/lib/email";
 import { stripeEnabled, getStripe } from "@/lib/stripe";
 import { normalizeEmail, normalizePhone, matchParent } from "@/lib/parent-link";
+import { fromTenantLocalIsoMinute } from "@/lib/datetime";
+import { formatInTimeZone } from "date-fns-tz";
+import { addDays } from "date-fns";
+import { logAudit } from "@/lib/audit";
 import type { EventType } from "@prisma/client";
 
 const bookingSchema = z.object({
@@ -46,7 +50,14 @@ export async function createBookingAction(input: BookingInput) {
   if (program.tenantId !== tenant.id) throw new Error("Program mismatch");
   if (program.archived) throw new Error("This program is no longer accepting bookings");
 
-  const startsAt = new Date(`${data.date}T${data.startTime}:00`);
+  // Parse the form-submitted local time in the tenant's timezone so a parent
+  // booking "10:00" in PT lands as the right UTC instant regardless of where
+  // this server action runs.
+  const tenantTimeZone = tenant.timeZone ?? "America/Los_Angeles";
+  const startsAt = fromTenantLocalIsoMinute(
+    `${data.date}T${data.startTime}`,
+    tenantTimeZone
+  );
   const endsAt = new Date(startsAt.getTime() + data.durationMin * 60 * 1000);
   if (startsAt < new Date()) throw new Error("Pick a time in the future");
 
@@ -101,7 +112,10 @@ export async function createBookingAction(input: BookingInput) {
     });
   }
 
-  // Upsert parent membership (PARENT role)
+  // Upsert parent membership (PARENT role). This row exists solely to grant
+  // family-portal access for this parent — it is *not* a team membership.
+  // The /admin/team and /coach/settings/team pages filter on STAFF_ROLES so
+  // these PARENT rows never appear alongside coaches and admins (KNS-22).
   await db.membership.upsert({
     where: { userId_tenantId: { userId: parentUser.id, tenantId: tenant.id } },
     create: { userId: parentUser.id, tenantId: tenant.id, role: "PARENT" },
@@ -152,8 +166,12 @@ export async function createBookingAction(input: BookingInput) {
       amount: program.price,
       currency: "usd",
       status: program.priceModel === "FREE" ? "PAID" : "SENT",
-      description: `${program.name} · ${data.date} ${data.startTime}`,
+      description: `${program.name} · ${formatInTimeZone(startsAt, tenantTimeZone, "MMM d, yyyy 'at' h:mm a")}`,
       paidAt: program.priceModel === "FREE" ? new Date() : null,
+      // 24h after the booked session — FREE invoices are already PAID so the
+      // dueAt would never fire; leave null in that case.
+      dueAt:
+        program.priceModel === "FREE" ? null : addDays(startsAt, 1),
     },
   });
 
@@ -164,6 +182,24 @@ export async function createBookingAction(input: BookingInput) {
       programId: program.id,
       invoiceId: invoice.id,
       status: program.priceModel === "FREE" ? "ACTIVE" : "PENDING",
+    },
+  });
+
+  // Audit trail: public booking. `actorUserId` stays null — the parent did
+  // not authenticate. /admin/audit renders null actors as "Public booking".
+  await logAudit({
+    tenantId: tenant.id,
+    actorUserId: null,
+    action: "booking.create",
+    targetType: "enrollment",
+    targetId: enrollment.id,
+    diff: {
+      programId: program.id,
+      programName: program.name,
+      playerId: player.id,
+      playerName: `${player.firstName} ${player.lastName}`,
+      invoiceId: invoice.id,
+      parentEmail,
     },
   });
 
@@ -236,6 +272,7 @@ export async function createBookingAction(input: BookingInput) {
       startsAt,
       endsAt,
       amountCents: 0,
+      timeZone: tenant.timeZone ?? undefined,
     }).catch(() => {
       // Best-effort — don't block redirect on email failure
     });
@@ -330,6 +367,7 @@ export async function createBookingAction(input: BookingInput) {
     endsAt,
     amountCents: program.price,
     pendingPayment: true,
+    timeZone: tenant.timeZone ?? undefined,
   }).catch(() => {});
 
   redirect(`/${tenant.slug}/book/success?invoice=${invoice.id}&pending=1`);

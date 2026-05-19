@@ -98,8 +98,8 @@ export function BrandingEditor({
         />
         <p className="text-xs text-ink-500">
           Shows up under the hero on /{tenantId.slice(0, 6)}…/ as an &ldquo;About&rdquo;
-          paragraph. For COACH-type tenants we emit an additional Person
-          JSON-LD block using this bio.
+          paragraph. Solo coach pages also publish a Person profile so search
+          engines connect your bio to your sessions — no action needed.
         </p>
       </section>
 

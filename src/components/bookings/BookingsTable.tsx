@@ -16,7 +16,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { formatCents } from "@/lib/utils";
-import { format, isPast } from "date-fns";
+import { isPast } from "date-fns";
+import { formatEventDateTime } from "@/lib/datetime";
 import {
   ClipboardList,
   ArrowUpDown,
@@ -64,9 +65,11 @@ export type BookingRow = {
 
 export function BookingsTable({
   tenantSlug,
+  tenantTimeZone,
   rows,
 }: {
   tenantSlug: string;
+  tenantTimeZone: string;
   rows: BookingRow[];
 }) {
   const [search, setSearch] = useState("");
@@ -137,7 +140,7 @@ export function BookingsTable({
           return (
             <span className="inline-flex items-center gap-1.5 text-xs font-mono text-ink-300">
               <CalendarIcon className="h-3 w-3 text-ink-500" />
-              {format(d, "MMM d · h:mm a")}
+              {formatEventDateTime(d, tenantTimeZone)}
               {isPast(d) && <span className="text-[10px] uppercase tracking-wider text-ink-700">past</span>}
             </span>
           );
@@ -219,7 +222,7 @@ export function BookingsTable({
           ),
       },
     ],
-    []
+    [tenantTimeZone]
   );
 
   const table = useReactTable({
@@ -312,7 +315,7 @@ export function BookingsTable({
                   const r = row.original;
                   const href = r.eventId
                     ? `/t/${tenantSlug}/coach/schedule/${r.eventId}`
-                    : `/t/${tenantSlug}/coach/roster`;
+                    : `/t/${tenantSlug}/coach/roster/${r.playerId}`;
                   return (
                     <tr
                       key={row.id}
@@ -338,7 +341,7 @@ export function BookingsTable({
               const r = row.original;
               const href = r.eventId
                 ? `/t/${tenantSlug}/coach/schedule/${r.eventId}`
-                : `/t/${tenantSlug}/coach/roster`;
+                : `/t/${tenantSlug}/coach/roster/${r.playerId}`;
               const meta = STATUS_META[r.status];
               return (
                 <Link
@@ -380,7 +383,7 @@ export function BookingsTable({
                   {r.eventStart && (
                     <div className="mt-1 text-xs text-ink-500 inline-flex items-center gap-1">
                       <CalendarIcon className="h-3 w-3" />
-                      {format(new Date(r.eventStart), "MMM d, h:mm a")}
+                      {formatEventDateTime(new Date(r.eventStart), tenantTimeZone)}
                     </div>
                   )}
                 </Link>

@@ -62,7 +62,7 @@ async function eventsWithRecipients(from: Date, to: Date) {
   return db.event.findMany({
     where: { startsAt: { gte: from, lt: to }, programId: { not: null } },
     include: {
-      tenant: { select: { name: true, slug: true } },
+      tenant: { select: { name: true, slug: true, timeZone: true } },
       location: { select: { name: true } },
       program: {
         include: {
@@ -126,6 +126,7 @@ async function fanOut(events: FanoutEvent[], lead: "24h" | "2h") {
           endsAt: event.endsAt,
           locationName: event.location?.name ?? null,
           lead,
+          timeZone: event.tenant.timeZone ?? undefined,
         });
         sent++;
       } catch (err) {

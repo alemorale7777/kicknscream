@@ -57,8 +57,9 @@ export default async function HomePage() {
           <span className="text-turf-400">Designed for parents.</span>
         </h1>
         <p className="mt-8 text-xl text-ink-300 max-w-2xl leading-relaxed text-pretty">
-          KickNScream replaces SportsEngine, TeamSnap, and three other apps with one modern
-          platform for coaches, academies, and clubs. Half the price, mobile-first, no fluff.
+          KickNScream collapses the patchwork of generic team apps coaches resort to into one
+          modern platform built for coaches, academies, and clubs. Half the price, mobile-first,
+          no fluff.
         </p>
         <div className="mt-10 flex flex-wrap gap-3">
           <Button variant="accent" size="lg" asChild>

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/tenant";
 import { canManageTenant } from "@/lib/roles";
+import { logAudit } from "@/lib/audit";
 import type { EventType } from "@prisma/client";
 
 const EVENT_TYPES = ["LESSON", "CLASS", "PRACTICE", "GAME", "TRYOUT", "CAMP", "CLINIC"] as const;
@@ -13,6 +14,7 @@ const baseEventSchema = z.object({
   tenantId: z.string(),
   type: z.enum(EVENT_TYPES),
   title: z.string().min(2).max(120),
+  description: z.string().max(2000).optional().nullable(),
   startsAt: z.string().datetime({ offset: true }),
   endsAt: z.string().datetime({ offset: true }),
   locationId: z.string().optional().nullable(),
@@ -68,6 +70,7 @@ export async function createEventAction(input: z.infer<typeof baseEventSchema>) 
       tenantId: data.tenantId,
       type: data.type as EventType,
       title: data.title,
+      description: data.description ?? null,
       startsAt: o.startsAt,
       endsAt: o.endsAt,
       locationId: data.locationId || null,
@@ -86,6 +89,22 @@ export async function createEventAction(input: z.infer<typeof baseEventSchema>) 
         select: { id: true },
       })
     : null;
+
+  await logAudit({
+    tenantId: data.tenantId,
+    actorUserId: membership.userId,
+    action: "event.create",
+    targetType: "event",
+    targetId: firstEvent?.id ?? undefined,
+    diff: {
+      title: data.title,
+      type: data.type,
+      startsAt: start.toISOString(),
+      endsAt: end.toISOString(),
+      occurrences: occurrences.length,
+      seriesId,
+    },
+  });
 
   revalidatePath(`/t/${membership.tenant.slug}/coach/schedule`);
   return {
@@ -161,6 +180,7 @@ export async function updateEventAction(input: z.infer<typeof updateEventSchema>
       data: {
         type: data.type as EventType,
         title: data.title,
+        description: data.description ?? null,
         startsAt: start,
         endsAt: end,
         locationId: data.locationId || null,
@@ -177,9 +197,10 @@ export async function updateEventAction(input: z.infer<typeof updateEventSchema>
       rows.map((row) =>
         db.event.update({
           where: { id: row.id },
-          data: {
+            data: {
             type: data.type as EventType,
             title: data.title,
+            description: data.description ?? null,
             startsAt: new Date(row.startsAt.getTime() + startDelta),
             endsAt: new Date(row.endsAt.getTime() + endDelta),
             locationId: data.locationId || null,
@@ -190,6 +211,22 @@ export async function updateEventAction(input: z.infer<typeof updateEventSchema>
       )
     );
   }
+
+  await logAudit({
+    tenantId: data.tenantId,
+    actorUserId: membership.userId,
+    action: "event.update",
+    targetType: "event",
+    targetId: data.id,
+    diff: {
+      title: data.title,
+      type: data.type,
+      startsAt: start.toISOString(),
+      endsAt: end.toISOString(),
+      scope: data.scope ?? "this",
+      affected: ids.length,
+    },
+  });
 
   revalidatePath(`/t/${membership.tenant.slug}/coach/schedule`);
   return { count: ids.length };
@@ -217,6 +254,15 @@ export async function deleteEventAction(
 
   const { ids } = await resolveSeriesScope(data.tenantId, data.eventId, data.scope);
   await db.event.deleteMany({ where: { id: { in: ids } } });
+
+  await logAudit({
+    tenantId: data.tenantId,
+    actorUserId: membership.userId,
+    action: "event.delete",
+    targetType: "event",
+    targetId: data.eventId,
+    diff: { scope: data.scope ?? "this", deleted: ids.length },
+  });
 
   revalidatePath(`/t/${membership.tenant.slug}/coach/schedule`);
   return { count: ids.length };

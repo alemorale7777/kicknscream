@@ -79,9 +79,10 @@ export function CalendarSubscribeCard({
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-ink-50">Subscribe in your calendar</p>
           <p className="text-xs text-ink-500 mt-0.5">
-            Every event on your kid&apos;s schedule lands in Apple Calendar,
-            Google Calendar, or Outlook within an hour of any change. The URL
-            is a private secret — anyone who has it can read your schedule.
+            Subscribe and every event on your KickNScream schedule lands in
+            Apple Calendar, Google Calendar, or Outlook within an hour of any
+            change. The URL is a private secret — anyone who has it can read
+            your schedule.
           </p>
         </div>
       </div>
