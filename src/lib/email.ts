@@ -445,3 +445,141 @@ export async function sendPackCompletedEmail(opts: {
     text,
   });
 }
+
+export async function sendResumeBookingEmail(opts: {
+  to: string;
+  parentName: string;
+  tenantName: string;
+  tenantSlug: string;
+  programName: string;
+  startsAt: Date;
+  resumeUrl: string;
+}) {
+  const resend = new Resend(env.AUTH_RESEND_KEY);
+  const dateLine = format(opts.startsAt, "EEEE, MMMM d · h:mm a");
+  const html = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Pick up where you left off</title></head>
+<body style="margin:0;padding:0;background:#050A07;font-family:-apple-system,system-ui,sans-serif;color:#F5F7F4;">
+  <div style="max-width:560px;margin:0 auto;padding:32px 24px;">
+    <div style="margin-bottom:32px;">
+      <span style="font-size:22px;font-weight:800;letter-spacing:-0.04em;color:#F5F7F4;">KICK<span style="color:#1FB663;">N</span>SCREAM</span>
+      <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#E8FF3C;margin-left:6px;vertical-align:middle;"></span>
+    </div>
+    <div style="background:#0F1C17;border:1px solid rgba(255,255,255,0.14);border-radius:12px;padding:32px;">
+      <p style="margin:0 0 8px;color:#94A39B;font-size:12px;text-transform:uppercase;letter-spacing:0.12em;">Booking draft saved</p>
+      <h1 style="margin:0 0 16px;font-size:24px;font-weight:700;letter-spacing:-0.02em;color:#F5F7F4;">Pick up where you left off</h1>
+      <p style="margin:0 0 12px;color:#C4CDC7;line-height:1.6;">Hi ${escapeHtml(opts.parentName.split(" ")[0])},</p>
+      <p style="margin:0 0 16px;color:#C4CDC7;line-height:1.6;">
+        You started booking <strong style="color:#F5F7F4;">${escapeHtml(opts.programName)}</strong>
+        with ${escapeHtml(opts.tenantName)} for <strong style="color:#F5F7F4;">${escapeHtml(dateLine)}</strong>.
+        Click below to finish — the slot is held for the next 15 minutes.
+      </p>
+      <p style="margin:16px 0 0;">
+        <a href="${escapeHtml(opts.resumeUrl)}" style="display:inline-block;background:#1FB663;color:#050A07;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600;">
+          Finish booking →
+        </a>
+      </p>
+    </div>
+    <p style="margin:20px 0 0;color:#5A6A62;font-size:12px;text-align:center;">Powered by KickNScream</p>
+  </div>
+</body></html>`;
+  const text = `Pick up where you left off booking ${opts.programName} with ${opts.tenantName} for ${dateLine}.\n${opts.resumeUrl}\n\nThe slot is held for 15 minutes.`;
+  await resend.emails.send({
+    from: env.EMAIL_FROM,
+    to: opts.to,
+    subject: `Pick up where you left off · ${opts.tenantName}`,
+    html,
+    text,
+  });
+}
+
+type DigestKid = {
+  firstName: string;
+  lastName: string;
+  attendedThisWeek: number;
+  totalThisWeek: number;
+  packBalance: number | null;
+  packSize: number | null;
+  notes: Array<{ content: string; eventTitle: string; createdAt: Date }>;
+  nextSession: { title: string; startsAt: Date } | null;
+};
+
+export async function sendFamilyDigestEmail(opts: {
+  to: string;
+  parentName: string;
+  tenantName: string;
+  tenantSlug: string;
+  kids: DigestKid[];
+}) {
+  const resend = new Resend(env.AUTH_RESEND_KEY);
+  const kidBlocks = opts.kids
+    .map(
+      (k) => `
+    <div style="background:#0F1C17;border:1px solid rgba(255,255,255,0.14);border-radius:12px;padding:20px;margin-bottom:12px;">
+      <h2 style="margin:0 0 12px;font-size:18px;font-weight:700;letter-spacing:-0.02em;color:#F5F7F4;">${escapeHtml(k.firstName)} ${escapeHtml(k.lastName)}</h2>
+      ${
+        k.totalThisWeek > 0
+          ? `<p style="margin:0 0 8px;color:#C4CDC7;font-size:14px;">📅 ${k.attendedThisWeek} of ${k.totalThisWeek} sessions this week</p>`
+          : ""
+      }
+      ${
+        k.packBalance !== null && k.packSize !== null
+          ? `<p style="margin:0 0 8px;color:#C4CDC7;font-size:14px;">🎟️ ${k.packBalance} of ${k.packSize} sessions left in pack</p>`
+          : ""
+      }
+      ${
+        k.nextSession
+          ? `<p style="margin:0 0 8px;color:#C4CDC7;font-size:14px;">⏭️ Next: ${escapeHtml(k.nextSession.title)} · ${format(k.nextSession.startsAt, "EEE, MMM d · h:mm a")}</p>`
+          : ""
+      }
+      ${
+        k.notes.length > 0
+          ? `<div style="border-top:1px solid rgba(255,255,255,0.08);margin-top:12px;padding-top:12px;">
+              <p style="margin:0 0 8px;color:#94A39B;font-size:11px;text-transform:uppercase;letter-spacing:0.12em;">Coach notes</p>
+              ${k.notes
+                .slice(0, 3)
+                .map(
+                  (n) => `<p style="margin:0 0 8px;color:#C4CDC7;font-size:14px;line-height:1.5;"><em style="color:#94A39B;">${escapeHtml(n.eventTitle)}:</em> ${escapeHtml(n.content.slice(0, 200))}${n.content.length > 200 ? "…" : ""}</p>`
+                )
+                .join("")}
+            </div>`
+          : ""
+      }
+    </div>
+  `
+    )
+    .join("");
+
+  const html = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>This week with ${escapeHtml(opts.tenantName)}</title></head>
+<body style="margin:0;padding:0;background:#050A07;font-family:-apple-system,system-ui,sans-serif;color:#F5F7F4;">
+  <div style="max-width:560px;margin:0 auto;padding:32px 24px;">
+    <div style="margin-bottom:32px;">
+      <span style="font-size:22px;font-weight:800;letter-spacing:-0.04em;color:#F5F7F4;">KICK<span style="color:#1FB663;">N</span>SCREAM</span>
+      <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#E8FF3C;margin-left:6px;vertical-align:middle;"></span>
+    </div>
+    <p style="margin:0 0 16px;color:#94A39B;font-size:12px;text-transform:uppercase;letter-spacing:0.12em;">Week recap · ${escapeHtml(opts.tenantName)}</p>
+    <h1 style="margin:0 0 16px;font-size:28px;font-weight:700;letter-spacing:-0.03em;color:#F5F7F4;">Hi ${escapeHtml(opts.parentName.split(" ")[0])} 👋</h1>
+    ${kidBlocks}
+    <p style="margin:20px 0 0;color:#5A6A62;font-size:12px;text-align:center;">
+      Powered by KickNScream · <a href="${env.NEXTAUTH_URL}/account/notifications" style="color:#5A6A62;">manage email settings</a>
+    </p>
+  </div>
+</body></html>`;
+  const text = `This week with ${opts.tenantName}\n\n${opts.kids
+    .map(
+      (k) =>
+        `${k.firstName}: ${k.attendedThisWeek}/${k.totalThisWeek} sessions${
+          k.packBalance !== null ? `, ${k.packBalance}/${k.packSize} left in pack` : ""
+        }${k.notes.length ? `\n  Notes: ${k.notes.map((n) => n.content.slice(0, 80)).join("; ")}` : ""}`
+    )
+    .join("\n\n")}`;
+
+  await resend.emails.send({
+    from: env.EMAIL_FROM,
+    to: opts.to,
+    subject: `This week with ${opts.tenantName}`,
+    html,
+    text,
+  });
+}
