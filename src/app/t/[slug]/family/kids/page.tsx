@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { requireTenant } from "@/lib/tenant";
+import { requireFamilyAccess } from "@/lib/tenant";
 import { db } from "@/lib/db";
+import { parentModelV2EnabledFor } from "@/lib/env";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -23,16 +24,21 @@ export default async function FamilyKidsListPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const { tenant, user } = await requireTenant(slug);
+  const { tenant, user, parent } = await requireFamilyAccess(slug);
+
+  const playerWhere =
+    parentModelV2EnabledFor(tenant.slug) && parent
+      ? { tenantId: tenant.id, parentRefId: parent.id }
+      : {
+          tenantId: tenant.id,
+          OR: [
+            { parentId: user.id },
+            { parentLinks: { some: { parentUserId: user.id } } },
+          ],
+        };
 
   const players = await db.player.findMany({
-    where: {
-      tenantId: tenant.id,
-      OR: [
-        { parentId: user.id },
-        { parentLinks: { some: { parentUserId: user.id } } },
-      ],
-    },
+    where: playerWhere,
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     include: {
       attendances: {

@@ -1,4 +1,4 @@
-import { requireTenant } from "@/lib/tenant";
+import { requireFamilyAccess } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +20,7 @@ export default async function FamilyPayPage({
 }) {
   const { slug } = await params;
   const sp = await searchParams;
-  const { tenant, user } = await requireTenant(slug);
+  const { tenant, user } = await requireFamilyAccess(slug);
 
   const invoices = await db.invoice.findMany({
     where: { tenantId: tenant.id, payerEmail: user.email ?? "@@none@@" },

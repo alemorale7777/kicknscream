@@ -1,4 +1,4 @@
-import { requireTenant } from "@/lib/tenant";
+import { requireFamilyAccess } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import { ServiceCatalog } from "@/components/book/ServiceCatalog";
 
@@ -10,7 +10,7 @@ export default async function FamilyBookPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const { tenant } = await requireTenant(slug);
+  const { tenant } = await requireFamilyAccess(slug);
 
   const programs = await db.program.findMany({
     where: { tenantId: tenant.id, archived: false },

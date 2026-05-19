@@ -17,6 +17,8 @@ export default defineConfig({
       EMAIL_FROM: "KickNScream <test@example.com>",
       AUTH_GOOGLE_ID: "test-google-id-stub-value",
       AUTH_GOOGLE_SECRET: "test-google-secret-stub-value",
+      AUDIT_EMAIL_HMAC_SECRET:
+        "0000000000000000000000000000000000000000000000000000000000000000",
       NODE_ENV: "test",
     },
   },

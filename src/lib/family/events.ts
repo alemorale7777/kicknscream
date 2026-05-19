@@ -1,4 +1,6 @@
 import { db } from "@/lib/db";
+import { parentModelV2Enabled, parentModelV2EnabledFor } from "@/lib/env";
+import type { Parent } from "@prisma/client";
 
 /**
  * Load upcoming events for the given parent's kids by walking
@@ -10,25 +12,40 @@ import { db } from "@/lib/db";
  *
  * Returns events ordered by start time, each with the matching player
  * attached so the UI can group by kid.
+ *
+ * When `parent-model-v2` is ENABLED and a Parent row is provided, we
+ * key player lookup off `parentRefId`. Otherwise we fall back to the
+ * legacy `parentId` (User.id) pointer + ParentPlayer junction.
  */
 export async function loadUpcomingFamilyEvents(
   tenantId: string,
   parentUserId: string,
-  opts: { limit?: number; since?: Date } = {}
+  opts: { limit?: number; since?: Date; parent?: Parent | null; tenantSlug?: string } = {}
 ) {
   const limit = opts.limit ?? 50;
   const since = opts.since ?? new Date();
+  const parent = opts.parent ?? null;
 
-  // Player set — direct parentId, plus the ParentPlayer junction so
-  // multi-guardian families also see events for kids they're linked to.
+  // Player set — branch on parent-model-v2:
+  //   - flag ON (global) or per-tenant override + Parent row: scope by
+  //     parentRefId (canonical link to Parent.id)
+  //   - otherwise: legacy parentId (User.id) + ParentPlayer junction
+  const v2 = opts.tenantSlug
+    ? parentModelV2EnabledFor(opts.tenantSlug)
+    : parentModelV2Enabled();
+  const playerWhere =
+    v2 && parent
+      ? { tenantId, parentRefId: parent.id }
+      : {
+          tenantId,
+          OR: [
+            { parentId: parentUserId },
+            { parentLinks: { some: { parentUserId } } },
+          ],
+        };
+
   const players = await db.player.findMany({
-    where: {
-      tenantId,
-      OR: [
-        { parentId: parentUserId },
-        { parentLinks: { some: { parentUserId } } },
-      ],
-    },
+    where: playerWhere,
     select: { id: true, firstName: true, lastName: true },
   });
   if (players.length === 0) return [];

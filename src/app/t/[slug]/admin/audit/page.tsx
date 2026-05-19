@@ -1,5 +1,6 @@
 import { requireTenant } from "@/lib/tenant";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { db } from "@/lib/db";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +30,20 @@ const ACTION_LABELS: Record<string, string> = {
   "enrollment.pack_completed": "Pack finished",
   "booking.draft_saved": "Booking draft saved",
   "booking.draft_resumed": "Booking draft resumed",
+  "parent.create": "Added parent contact",
+  "parent.claim": "Parent claimed their account",
+  "parent.update": "Edited parent details",
+  "parent.merge": "Merged duplicate parents",
+  "parent.delete_request": "Requested parent deletion",
+  "parent.delete_request_expired": "Parent-deletion request expired",
+  "parent.delete_complete": "Completed parent deletion",
+  "parent.claim_email_sent": "Sent parent-claim email",
+  "tenant_parent.add": "Granted family-portal access",
+  "tenant_parent.revoke": "Revoked family-portal access",
+  "tenant_parent.restore": "Restored family-portal access",
+  "tenant_parent.notes_update": "Updated parent notes",
+  "data.parent_backfill": "Backfilled Parent rows from Memberships",
+  "data.audit_backfill": "Redacted historical audit emails",
 };
 
 function labelFor(action: string): string {
@@ -112,6 +127,22 @@ export default async function AdminAuditPage({
                           {entry.targetType}
                         </Badge>
                       )}
+                      {entry.targetId && (
+                        entry.targetType === "parent" ||
+                        entry.targetType === "tenant_parent" ? (
+                          <Link
+                            href={`/t/${slug}/coach/parents/${entry.targetId}`}
+                            prefetch={false}
+                            className="text-turf-300 hover:text-turf-200 underline text-xs font-mono"
+                          >
+                            {entry.targetId}
+                          </Link>
+                        ) : (
+                          <span className="text-xs font-mono text-ink-500">
+                            {entry.targetId}
+                          </span>
+                        )
+                      )}
                     </div>
                     <p className="text-xs text-ink-500 mt-0.5">
                       {actor
@@ -123,7 +154,9 @@ export default async function AdminAuditPage({
                       </span>
                     </p>
                     {diff && Object.keys(diff).length > 0 && (
-                      <DiffPreview diff={diff} />
+                      <div className="mt-2">
+                        <DiffView diff={diff} />
+                      </div>
                     )}
                   </div>
                 </li>
@@ -136,22 +169,49 @@ export default async function AdminAuditPage({
   );
 }
 
-function DiffPreview({ diff }: { diff: Record<string, unknown> }) {
-  const entries = Object.entries(diff).slice(0, 6);
-  if (entries.length === 0) return null;
+function DiffView({ diff }: { diff: Record<string, unknown> }) {
+  if (diff.before && diff.after) {
+    const before = diff.before as Record<string, unknown>;
+    const after = diff.after as Record<string, unknown>;
+    return (
+      <table className="text-xs w-full">
+        <thead>
+          <tr>
+            <th className="text-left text-ink-500 font-normal">Field</th>
+            <th className="text-left text-ink-500 font-normal">Before</th>
+            <th className="text-left text-ink-500 font-normal">After</th>
+          </tr>
+        </thead>
+        <tbody>
+          {Object.keys(after).map((k) => (
+            <tr key={k}>
+              <td className="text-ink-500 pr-2">{k}</td>
+              <td className="pr-2 font-mono">{String(before[k] ?? "—")}</td>
+              <td className="font-mono">{String(after[k] ?? "—")}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    );
+  }
+  if (diff.winnerId && diff.loserId) {
+    return (
+      <p className="text-xs text-ink-300">
+        {String(diff.kidsMoved ?? 0)} kids moved ·{" "}
+        {String(diff.tenantsCollapsed ?? 0)} tenants
+      </p>
+    );
+  }
   return (
-    <div className="mt-2 flex flex-wrap gap-1.5">
-      {entries.map(([k, v]) => (
-        <span
-          key={k}
-          className="inline-flex items-center gap-1 rounded border border-line bg-pitch-900/60 px-1.5 py-0.5 text-[10px] font-mono"
-        >
-          <span className="text-ink-500">{k}:</span>
-          <span className="text-ink-300">
+    <dl className="text-xs grid grid-cols-[max-content_1fr] gap-x-2 gap-y-0.5">
+      {Object.entries(diff).map(([k, v]) => (
+        <div key={k} className="contents">
+          <dt className="text-ink-500">{k}</dt>
+          <dd className="font-mono text-ink-300 break-all">
             {typeof v === "object" ? JSON.stringify(v) : String(v)}
-          </span>
-        </span>
+          </dd>
+        </div>
       ))}
-    </div>
+    </dl>
   );
 }

@@ -4,10 +4,12 @@ import { z } from "zod";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
+import { parentModelV2EnabledFor, parentModelV2ShadowFor } from "@/lib/env";
 import { sendBookingConfirmation } from "@/lib/email";
 import { stripeEnabled, getStripe } from "@/lib/stripe";
 import { normalizeEmail, normalizePhone, matchParent } from "@/lib/parent-link";
 import { fromTenantLocalIsoMinute } from "@/lib/datetime";
+import { findOrCreateParent, issueClaimToken } from "@/lib/parents";
 import { formatInTimeZone } from "date-fns-tz";
 import { addDays } from "date-fns";
 import { logAudit } from "@/lib/audit";
@@ -67,67 +69,104 @@ export async function createBookingAction(input: BookingInput) {
   const parentEmail = normalizeEmail(data.parentEmail) ?? data.parentEmail.toLowerCase().trim();
   const normPhone = normalizePhone(data.parentPhone ?? null);
 
-  const emailMatch = await db.user.findUnique({ where: { email: parentEmail } });
-  let parentUser: { id: string; email: string | null; phone: string | null; name: string | null };
-  if (emailMatch) {
-    parentUser = await db.user.update({
-      where: { id: emailMatch.id },
-      data: {
-        name: data.parentName,
-        phone: data.parentPhone || emailMatch.phone,
-      },
-    });
-  } else if (normPhone) {
-    const candidatesByTenant = await db.user.findMany({
-      where: {
-        memberships: { some: { tenantId: tenant.id, role: "PARENT" } },
-        phone: { not: null },
-      },
-      select: { id: true, email: true, phone: true, name: true },
-      take: 200,
-    });
-    const matched = matchParent(candidatesByTenant, {
+  // PARENT_MODEL_V2 shadow path: write Parent + TenantParent alongside (or
+  // instead of) the legacy User+PARENT-Membership pair. In "shadow" mode both
+  // paths run so the new tables backfill while booking still flows through
+  // the old code; in "true" mode the legacy User upsert + PARENT Membership
+  // upsert are skipped entirely and Player.parentRefId becomes the source of
+  // truth for parent identity on this booking.
+  let parentRefId: string | null = null;
+  if (parentModelV2ShadowFor(tenant.slug)) {
+    const result = await findOrCreateParent(db, {
+      tenantId: tenant.id,
       email: parentEmail,
-      phone: normPhone,
+      name: data.parentName,
+      phone: data.parentPhone ?? null,
     });
-    parentUser = matched
-      ? await db.user.update({
-          where: { id: matched.id },
-          data: { name: data.parentName },
-        })
-      : await db.user.create({
-          data: {
-            email: parentEmail,
-            name: data.parentName,
-            phone: data.parentPhone || null,
-          },
+    parentRefId = result.parent.id;
+    // If a User row already exists for this email (e.g., prior staff invite),
+    // attach it so cross-tenant continuity works from booking #1.
+    if (!result.parent.userId) {
+      const existingUser = await db.user.findUnique({
+        where: { email: parentEmail },
+      });
+      if (existingUser) {
+        await db.parent.update({
+          where: { id: result.parent.id },
+          data: { userId: existingUser.id },
         });
-  } else {
-    parentUser = await db.user.create({
-      data: {
+      }
+    }
+  }
+
+  let parentUser: { id: string; email: string | null; phone: string | null; name: string | null } | null = null;
+  if (!parentModelV2EnabledFor(tenant.slug)) {
+    const emailMatch = await db.user.findUnique({ where: { email: parentEmail } });
+    if (emailMatch) {
+      parentUser = await db.user.update({
+        where: { id: emailMatch.id },
+        data: {
+          name: data.parentName,
+          phone: data.parentPhone || emailMatch.phone,
+        },
+      });
+    } else if (normPhone) {
+      const candidatesByTenant = await db.user.findMany({
+        where: {
+          memberships: { some: { tenantId: tenant.id, role: "PARENT" } },
+          phone: { not: null },
+        },
+        select: { id: true, email: true, phone: true, name: true },
+        take: 200,
+      });
+      const matched = matchParent(candidatesByTenant, {
         email: parentEmail,
-        name: data.parentName,
-        phone: data.parentPhone || null,
-      },
+        phone: normPhone,
+      });
+      parentUser = matched
+        ? await db.user.update({
+            where: { id: matched.id },
+            data: { name: data.parentName },
+          })
+        : await db.user.create({
+            data: {
+              email: parentEmail,
+              name: data.parentName,
+              phone: data.parentPhone || null,
+            },
+          });
+    } else {
+      parentUser = await db.user.create({
+        data: {
+          email: parentEmail,
+          name: data.parentName,
+          phone: data.parentPhone || null,
+        },
+      });
+    }
+
+    // Upsert parent membership (PARENT role). This row exists solely to grant
+    // family-portal access for this parent — it is *not* a team membership.
+    // The /admin/team and /coach/settings/team pages filter on STAFF_ROLES so
+    // these PARENT rows never appear alongside coaches and admins (KNS-22).
+    await db.membership.upsert({
+      where: { userId_tenantId: { userId: parentUser.id, tenantId: tenant.id } },
+      create: { userId: parentUser.id, tenantId: tenant.id, role: "PARENT" },
+      update: {},
     });
   }
 
-  // Upsert parent membership (PARENT role). This row exists solely to grant
-  // family-portal access for this parent — it is *not* a team membership.
-  // The /admin/team and /coach/settings/team pages filter on STAFF_ROLES so
-  // these PARENT rows never appear alongside coaches and admins (KNS-22).
-  await db.membership.upsert({
-    where: { userId_tenantId: { userId: parentUser.id, tenantId: tenant.id } },
-    create: { userId: parentUser.id, tenantId: tenant.id, role: "PARENT" },
-    update: {},
-  });
-
-  // Find-or-create player by (tenant, parent, first+last+dob)
+  // Find-or-create player by (tenant, parent, first+last+dob). When the V2
+  // flag is fully on we have no parentUser to key on, so we look up by the
+  // new parentRefId column instead. In shadow + off modes parentUser exists
+  // and the legacy parentId column is the source of truth for lookup.
   const playerDob = new Date(`${data.playerDob}T00:00:00.000Z`);
   let player = await db.player.findFirst({
     where: {
       tenantId: tenant.id,
-      parentId: parentUser.id,
+      ...(parentUser
+        ? { parentId: parentUser.id }
+        : { parentRefId: parentRefId! }),
       firstName: data.playerFirstName,
       lastName: data.playerLastName,
     },
@@ -136,7 +175,8 @@ export async function createBookingAction(input: BookingInput) {
     player = await db.player.create({
       data: {
         tenantId: tenant.id,
-        parentId: parentUser.id,
+        parentId: parentUser?.id ?? null, // legacy mirror
+        parentRefId: parentRefId, // new column (set whenever shadow|true)
         firstName: data.playerFirstName,
         lastName: data.playerLastName,
         dob: playerDob,
@@ -145,18 +185,24 @@ export async function createBookingAction(input: BookingInput) {
     });
   }
 
-  // Track parent ↔ player link (multi-guardian families)
-  await db.parentPlayer.upsert({
-    where: {
-      parentUserId_playerId: { parentUserId: parentUser.id, playerId: player.id },
-    },
-    create: {
-      parentUserId: parentUser.id,
-      playerId: player.id,
-      relationship: "parent",
-    },
-    update: {},
-  });
+  // Track parent ↔ player link (multi-guardian families). ParentPlayer.parentUserId
+  // is still required by the schema, so we only write this row when we have a
+  // parentUser (shadow + off modes). In flag-true mode the link is captured by
+  // Player.parentRefId alone.
+  if (parentUser) {
+    await db.parentPlayer.upsert({
+      where: {
+        parentUserId_playerId: { parentUserId: parentUser.id, playerId: player.id },
+      },
+      create: {
+        parentUserId: parentUser.id,
+        playerId: player.id,
+        relationship: "parent",
+        parentRefId: parentRefId, // mirror onto new column when available
+      },
+      update: {},
+    });
+  }
 
   // Create invoice in PENDING state with full price
   const invoice = await db.invoice.create({
@@ -261,6 +307,22 @@ export async function createBookingAction(input: BookingInput) {
     data: { claimedAt: new Date() },
   });
 
+  // Magic-link claim CTA — only when the Parent row has no User attached
+  // yet (i.e. the parent has not signed in / claimed via this flow yet).
+  // Flag-off mode skips this entirely because the legacy User upsert above
+  // already authenticates the parent identity, so there is nothing to
+  // claim.
+  let claimUrl: string | undefined;
+  if (parentModelV2ShadowFor(tenant.slug) && parentRefId) {
+    const parentRow = await db.parent.findUniqueOrThrow({
+      where: { id: parentRefId },
+    });
+    if (!parentRow.userId) {
+      const token = await issueClaimToken(db, parentRefId);
+      claimUrl = `${env.NEXTAUTH_URL}/claim/${token}`;
+    }
+  }
+
   // Free program → finalize, send email, redirect to confirmation
   if (program.priceModel === "FREE" || program.price === 0) {
     await sendBookingConfirmation({
@@ -273,6 +335,7 @@ export async function createBookingAction(input: BookingInput) {
       endsAt,
       amountCents: 0,
       timeZone: tenant.timeZone ?? undefined,
+      claimUrl,
     }).catch(() => {
       // Best-effort — don't block redirect on email failure
     });
@@ -368,6 +431,7 @@ export async function createBookingAction(input: BookingInput) {
     amountCents: program.price,
     pendingPayment: true,
     timeZone: tenant.timeZone ?? undefined,
+    claimUrl,
   }).catch(() => {});
 
   redirect(`/${tenant.slug}/book/success?invoice=${invoice.id}&pending=1`);
