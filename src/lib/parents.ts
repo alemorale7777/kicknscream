@@ -93,3 +93,32 @@ export async function restoreTenantAccess(
     data: { status: "ACTIVE", revokedAt: null },
   });
 }
+
+/**
+ * Attach an auth User to a Parent (claim flow). One Parent maps to at
+ * most one User — the Parent.userId column is uniquely constrained, so
+ * attempting to attach a second User to the same Parent will surface as
+ * a Prisma unique-violation upstream.
+ */
+export async function attachUserToParent(
+  db: Db,
+  args: { parentId: string; userId: string }
+): Promise<void> {
+  await db.parent.update({
+    where: { id: args.parentId },
+    data: { userId: args.userId },
+  });
+}
+
+/**
+ * Look up the Parent row attached to a given User. Returns null when
+ * the User has never claimed a Parent. Uses findFirst (not findUnique)
+ * to avoid surfacing a runtime error if the @unique invariant is ever
+ * relaxed; the unique constraint still guarantees at most one row.
+ */
+export async function findParentForUser(
+  db: Db,
+  userId: string
+): Promise<Parent | null> {
+  return db.parent.findFirst({ where: { userId } });
+}

@@ -29,6 +29,8 @@ import {
   findOrCreateParent,
   revokeTenantAccess,
   restoreTenantAccess,
+  attachUserToParent,
+  findParentForUser,
 } from "@/lib/parents";
 
 const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL! });
@@ -163,5 +165,44 @@ describe("revokeTenantAccess / restoreTenantAccess", () => {
       where: { tenantId_parentId: { tenantId: other.id, parentId: parent.id } },
     });
     expect(otherTp?.status).toBe("ACTIVE");
+  });
+});
+
+describe("attachUserToParent / findParentForUser", () => {
+  it("sets Parent.userId", async () => {
+    const email = `claim-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`;
+    const user = await db.user.create({
+      data: { email, name: "Claim Test" },
+    });
+    const { parent } = await findOrCreateParent(db, {
+      tenantId: TENANT_ID,
+      email,
+    });
+    await attachUserToParent(db, { parentId: parent.id, userId: user.id });
+    const refreshed = await db.parent.findUnique({ where: { id: parent.id } });
+    expect(refreshed?.userId).toBe(user.id);
+  });
+
+  it("findParentForUser returns null when user has no Parent", async () => {
+    const email = `nope-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`;
+    const user = await db.user.create({
+      data: { email, name: "Nope" },
+    });
+    const found = await findParentForUser(db, user.id);
+    expect(found).toBeNull();
+  });
+
+  it("findParentForUser returns the Parent when attached", async () => {
+    const email = `yes-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`;
+    const user = await db.user.create({
+      data: { email, name: "Yes" },
+    });
+    const { parent } = await findOrCreateParent(db, {
+      tenantId: TENANT_ID,
+      email,
+    });
+    await attachUserToParent(db, { parentId: parent.id, userId: user.id });
+    const found = await findParentForUser(db, user.id);
+    expect(found?.id).toBe(parent.id);
   });
 });
