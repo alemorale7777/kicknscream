@@ -181,6 +181,26 @@ export async function createBookingAction(input: BookingInput) {
     });
   }
 
+  // Reject if another parent has an active hold on the same slot
+  // (within ±5 minutes — drafts targeting the same hour count as
+  // conflicting).
+  const overlapStart = new Date(startsAt.getTime() - 5 * 60 * 1000);
+  const overlapEnd = new Date(endsAt.getTime() + 5 * 60 * 1000);
+  const heldByOther = await db.bookingDraft.findFirst({
+    where: {
+      programId: program.id,
+      email: { not: parentEmail },
+      claimedAt: null,
+      expiresAt: { gt: new Date() },
+      startsAt: { gte: overlapStart, lte: overlapEnd },
+    },
+  });
+  if (heldByOther) {
+    throw new Error(
+      "Another family is finishing checkout for this slot — pick a different time."
+    );
+  }
+
   // Create the actual scheduled event
   const event = await db.event.create({
     data: {
@@ -191,6 +211,18 @@ export async function createBookingAction(input: BookingInput) {
       startsAt,
       endsAt,
     },
+  });
+
+  // Claim any draft this parent had open for this program — keeps the
+  // audit trail (how many resumes before they finished) intact.
+  await db.bookingDraft.updateMany({
+    where: {
+      tenantId: tenant.id,
+      programId: program.id,
+      email: parentEmail,
+      claimedAt: null,
+    },
+    data: { claimedAt: new Date() },
   });
 
   // Free program → finalize, send email, redirect to confirmation
