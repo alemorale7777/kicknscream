@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { canManageTenant } from "@/lib/roles";
 import { toCSV, csvFilename } from "@/lib/csv";
+import { invoiceDisplayStatus } from "@/lib/invoiceStatus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -52,6 +53,7 @@ const HEADERS: Record<string, string[]> = {
     "description",
     "stripePaymentIntentId",
     "createdAt",
+    "dueAt",
     "paidAt",
   ],
   schedule: [
@@ -157,7 +159,7 @@ export async function GET(
         programName: e.program.name,
         status: e.status,
         invoiceAmountCents: e.invoice?.amount ?? "",
-        invoiceStatus: e.invoice?.status ?? "",
+        invoiceStatus: e.invoice ? invoiceDisplayStatus(e.invoice) : "",
         parentEmail: e.player.parentId
           ? parentEmailById.get(e.player.parentId) ?? ""
           : "",
@@ -175,10 +177,13 @@ export async function GET(
         payerEmail: i.payerEmail,
         amountCents: i.amount,
         currency: i.currency,
-        status: i.status,
+        // KNS-23: surface the same OVERDUE/PAID/etc. label the coach UI shows,
+        // so the export and the on-screen table never disagree.
+        status: invoiceDisplayStatus(i),
         description: i.description,
         stripePaymentIntentId: i.stripePaymentIntentId,
         createdAt: i.createdAt,
+        dueAt: i.dueAt,
         paidAt: i.paidAt,
       }));
       break;

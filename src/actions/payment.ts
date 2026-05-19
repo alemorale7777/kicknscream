@@ -7,6 +7,7 @@ import { env } from "@/lib/env";
 import { getCurrentUser } from "@/lib/tenant";
 import { canManageTenant } from "@/lib/roles";
 import { getStripe, stripeEnabled } from "@/lib/stripe";
+import { logAudit } from "@/lib/audit";
 import type { PaymentMethod } from "@prisma/client";
 
 const PAYMENT_METHODS = ["CARD", "CASH", "CHECK", "VENMO", "ZELLE", "PAYPAL", "ACH", "OTHER"] as const;
@@ -78,6 +79,20 @@ export async function recordPaymentAction(input: z.infer<typeof recordSchema>) {
         ]
       : []),
   ]);
+
+  await logAudit({
+    tenantId: data.tenantId,
+    actorUserId: user.id,
+    action: "payment.record",
+    targetType: "invoice",
+    targetId: invoice.id,
+    diff: {
+      amountCents,
+      method: data.method,
+      reference: data.reference ?? null,
+      newStatus,
+    },
+  });
 
   revalidatePath(`/t/${membership.tenant.slug}/coach/payments`);
   revalidatePath(`/t/${membership.tenant.slug}/coach/dashboard`);

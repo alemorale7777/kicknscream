@@ -1,5 +1,5 @@
 import { requireTenant } from "@/lib/tenant";
-import { canManageTenant } from "@/lib/roles";
+import { canManageTenant, STAFF_ROLES } from "@/lib/roles";
 import { db } from "@/lib/db";
 import { TeamManager } from "@/components/settings/TeamManager";
 
@@ -12,7 +12,9 @@ export default async function TeamPage({ params }: { params: Promise<{ slug: str
 
   const [members, invites] = await Promise.all([
     db.membership.findMany({
-      where: { tenantId: tenant.id },
+      // PARENT/PLAYER memberships are family-portal access only and must
+      // not surface on the team page (KNS-22).
+      where: { tenantId: tenant.id, role: { in: STAFF_ROLES } },
       include: { user: true },
       orderBy: [
         { role: "asc" }, // OWNER first alphabetically? — enum order works in practice

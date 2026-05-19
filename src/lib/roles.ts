@@ -9,6 +9,13 @@ const ROLE_RANK: Record<Role, number> = {
 };
 
 /**
+ * Roles that count as tenant *staff*. The team-management pages render this
+ * set; PARENT/PLAYER memberships exist for portal routing and family-shell
+ * access only and must not appear alongside coaches and admins.
+ */
+export const STAFF_ROLES: Role[] = ["OWNER", "ADMIN", "COACH"];
+
+/**
  * Returns true if the actor's role meets or exceeds the required role.
  * Pure function — safe to use anywhere (client, server, tests).
  */

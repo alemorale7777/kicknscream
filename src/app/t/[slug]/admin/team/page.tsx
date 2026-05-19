@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { PageHeader } from "@/components/chrome/PageHeader";
 import { TeamManager } from "@/components/settings/TeamManager";
 import { can } from "@/lib/auth/permissions";
-import { canManageTenant } from "@/lib/roles";
+import { canManageTenant, STAFF_ROLES } from "@/lib/roles";
 
 export const metadata = { title: "Team" };
 
@@ -22,7 +22,9 @@ export default async function AdminTeamPage({
 
   const [members, invites] = await Promise.all([
     db.membership.findMany({
-      where: { tenantId: tenant.id },
+      // Hide PARENT/PLAYER memberships — those exist for family-portal
+      // routing only and must not appear alongside coaches and admins.
+      where: { tenantId: tenant.id, role: { in: STAFF_ROLES } },
       include: { user: true },
       orderBy: [{ role: "asc" }, { createdAt: "asc" }],
     }),
