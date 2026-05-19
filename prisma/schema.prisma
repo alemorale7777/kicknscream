@@ -107,6 +107,9 @@ model Tenant {
   stripePayoutsEnabled    Boolean               @default(false)
   stripeDetailsSubmitted  Boolean               @default(false)
   stripeRequirementsDueAt DateTime?
+  // IANA timezone identifier (e.g. "America/Los_Angeles"). Drives all
+  // server- and client-side rendering of event times for this tenant.
+  timeZone                String                @default("America/Los_Angeles")
   subscription            Subscription?
   memberships             Membership[]
   locations               Location[]
