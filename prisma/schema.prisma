@@ -98,6 +98,10 @@ model Tenant {
   // Uniqueness is enforced at the application layer (server action checks
   // findFirst before write) to keep this migration purely additive.
   customDomain            String?
+  // Domain provisioning status mirrored from the Vercel Domains API.
+  // null  → no domain set or Vercel API isn't configured (manual flow)
+  // pending_dns | verified | misconfigured | unknown
+  customDomainStatus      String?
   // KYC mirror columns kept fresh by the account.updated webhook
   stripeChargesEnabled    Boolean               @default(false)
   stripePayoutsEnabled    Boolean               @default(false)

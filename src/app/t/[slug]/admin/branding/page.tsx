@@ -71,6 +71,7 @@ export default async function AdminBrandingPage({
       <CustomDomainCard
         tenantId={tenant.id}
         initialDomain={tenant.customDomain ?? null}
+        initialStatus={tenant.customDomainStatus ?? null}
       />
     </div>
   );

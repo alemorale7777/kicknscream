@@ -7,6 +7,12 @@ import { db } from "@/lib/db";
 import { ensureUniqueSlug, generateSlug, isReservedSlug } from "@/lib/slug";
 import { getCurrentUser } from "@/lib/tenant";
 import { canManageTenant } from "@/lib/roles";
+import {
+  attachDomain,
+  detachDomain,
+  getDomainStatus,
+  vercelDomainsEnabled,
+} from "@/lib/vercelDomains";
 
 const tenantTypeEnum = z.enum(["COACH", "INSTITUTION", "CLUB"]);
 
@@ -193,10 +199,11 @@ const domainSchema = z.object({
  * the application layer (we don't ship a unique index in the same migration
  * because production rows would block it).
  *
- * This action only updates the database row — DNS verification + cert
- * issuance happens out-of-band by adding the domain to the Vercel project.
- * The settings page surfaces the manual steps until we wire the Vercel
- * Domains API.
+ * When VERCEL_TOKEN + VERCEL_PROJECT_ID are configured this also calls the
+ * Vercel Domains API (attach on save, detach on clear) and mirrors the
+ * provisioning status onto Tenant.customDomainStatus. When unconfigured the
+ * action behaves as before — just persists the column and the settings page
+ * surfaces the manual CNAME steps.
  */
 export async function updateTenantDomainAction(
   input: z.infer<typeof domainSchema>
@@ -224,9 +231,50 @@ export async function updateTenantDomainAction(
     }
   }
 
+  const prev = await db.tenant.findUnique({
+    where: { id: data.tenantId },
+    select: { customDomain: true },
+  });
+  const previousDomain = prev?.customDomain ?? null;
+
+  let nextStatus: string | null = null;
+  let provisionWarning: string | null = null;
+
+  if (vercelDomainsEnabled()) {
+    // Detach the previous domain when it's changing or being cleared. We
+    // don't bail on detach failures — the new attachment is what matters,
+    // and detach failure on a stale domain just leaves an orphaned entry.
+    if (previousDomain && previousDomain !== next) {
+      const detached = await detachDomain(previousDomain);
+      if (!detached.ok) {
+        console.warn("[tenant.domain] detach failed", {
+          domain: previousDomain,
+          error: detached.error,
+        });
+      }
+    }
+    if (next && next !== previousDomain) {
+      const attached = await attachDomain(next);
+      if (!attached.ok) {
+        throw new Error(
+          attached.error ?? "Could not attach domain to Vercel"
+        );
+      }
+      // Poll once for initial status. Most domains land on pending_dns until
+      // the CNAME propagates — the settings card polls for updates.
+      nextStatus = await getDomainStatus(next);
+    } else if (next) {
+      // Domain unchanged; just re-read status in case it's caught up.
+      nextStatus = await getDomainStatus(next);
+    }
+  } else if (next) {
+    provisionWarning =
+      "Vercel API not configured — add the domain in the Vercel dashboard manually.";
+  }
+
   await db.tenant.update({
     where: { id: data.tenantId },
-    data: { customDomain: next },
+    data: { customDomain: next, customDomainStatus: nextStatus },
   });
 
   if (membership.tenant) {
@@ -236,13 +284,51 @@ export async function updateTenantDomainAction(
         actorUserId: user.id,
         action: next ? "tenant.domain_set" : "tenant.domain_clear",
         targetType: "Tenant",
-        diff: { customDomain: next },
+        diff: { customDomain: next, customDomainStatus: nextStatus },
       },
     });
     revalidatePath(`/t/${membership.tenant.slug}/admin/branding`);
     revalidatePath(`/t/${membership.tenant.slug}/admin/audit`);
   }
-  return { customDomain: next };
+  return {
+    customDomain: next,
+    customDomainStatus: nextStatus,
+    provisionWarning,
+  };
+}
+
+/**
+ * Re-poll Vercel for the latest config state for this tenant's domain and
+ * persist the result. Called from the CustomDomainCard via setInterval to
+ * surface verified/misconfigured transitions without a page reload.
+ */
+export async function refreshTenantDomainStatusAction(input: {
+  tenantId: string;
+}) {
+  const user = await getCurrentUser();
+  if (!user) throw new Error("Not authenticated");
+  const membership = user.memberships.find((m) => m.tenantId === input.tenantId);
+  if (!membership || !canManageTenant(membership.role)) {
+    throw new Error("You don't have permission");
+  }
+  if (!vercelDomainsEnabled()) {
+    return { customDomainStatus: null as string | null };
+  }
+  const tenant = await db.tenant.findUnique({
+    where: { id: input.tenantId },
+    select: { customDomain: true, customDomainStatus: true },
+  });
+  if (!tenant?.customDomain) {
+    return { customDomainStatus: null as string | null };
+  }
+  const status = await getDomainStatus(tenant.customDomain);
+  if (status !== tenant.customDomainStatus) {
+    await db.tenant.update({
+      where: { id: input.tenantId },
+      data: { customDomainStatus: status },
+    });
+  }
+  return { customDomainStatus: status as string };
 }
 
 const deleteTenantSchema = z.object({
