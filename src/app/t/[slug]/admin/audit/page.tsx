@@ -27,6 +27,8 @@ const ACTION_LABELS: Record<string, string> = {
   "payment.refund": "Refund issued",
   "enrollment.pack_consumed": "Pack session used",
   "enrollment.pack_completed": "Pack finished",
+  "booking.draft_saved": "Booking draft saved",
+  "booking.draft_resumed": "Booking draft resumed",
 };
 
 function labelFor(action: string): string {

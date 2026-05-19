@@ -28,7 +28,10 @@ export type AnalyticsEvent =
   | "stripe_connect_started"
   | "refund_issued"
   | "pack_completed"
-  | "billing_portal_opened";
+  | "billing_portal_opened"
+  | "booking_draft_saved"
+  | "booking_draft_resumed"
+  | "player_photo_uploaded";
 
 type Properties = Record<string, string | number | boolean | null | undefined>;
 
