@@ -3,7 +3,9 @@
 import { useMemo } from "react";
 import { EVENT_TONE } from "@/lib/eventTone";
 import { cn } from "@/lib/utils";
-import { format, isToday, differenceInMinutes, isSameDay } from "date-fns";
+import { format, isToday, differenceInMinutes } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
+import { formatEventTime } from "@/lib/datetime";
 import { Clock, MapPin, Users } from "lucide-react";
 import type { Event, Location } from "@prisma/client";
 
@@ -16,27 +18,40 @@ const HOURS = Array.from({ length: DAY_END_HOUR - DAY_START_HOUR + 1 }, (_, i) =
 
 export function DayView({
   anchorDate,
+  tenantTimeZone,
   events,
   canEdit,
   onCellClick,
   onEventClick,
 }: {
   anchorDate: Date;
+  tenantTimeZone: string;
   events: EventWithLocation[];
   canEdit: boolean;
   onCellClick: (date: Date) => void;
   onEventClick: (event: EventWithLocation) => void;
 }) {
-  const dayEvents = useMemo(
-    () => events.filter((e) => isSameDay(e.startsAt, anchorDate)).sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime()),
-    [events, anchorDate]
+  const dayKey = useMemo(
+    () => formatInTimeZone(anchorDate, tenantTimeZone, "yyyy-MM-dd"),
+    [anchorDate, tenantTimeZone]
   );
 
-  const visibleStart = useMemo(() => {
-    const d = new Date(anchorDate);
-    d.setHours(DAY_START_HOUR, 0, 0, 0);
-    return d;
-  }, [anchorDate]);
+  const dayEvents = useMemo(
+    () =>
+      events
+        .filter(
+          (e) => formatInTimeZone(e.startsAt, tenantTimeZone, "yyyy-MM-dd") === dayKey
+        )
+        .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime()),
+    [events, dayKey, tenantTimeZone]
+  );
+
+  // Minutes-into-tenant-local-day, anchored to the visible band that starts at DAY_START_HOUR.
+  const minutesIntoDay = (instant: Date): number => {
+    const [h, m] = formatInTimeZone(instant, tenantTimeZone, "HH:mm").split(":").map(Number);
+    return h * 60 + m;
+  };
+  const VISIBLE_START_MIN = DAY_START_HOUR * 60;
 
   function handleClick(e: React.MouseEvent, hour: number) {
     if (!canEdit) return;
@@ -65,10 +80,10 @@ export function DayView({
               today ? "text-turf-300" : "text-ink-500"
             )}
           >
-            {format(anchorDate, "EEEE")}
+            {formatInTimeZone(anchorDate, tenantTimeZone, "EEEE")}
           </p>
           <p className={cn("font-bold text-2xl tracking-tight mt-0.5", today && "text-turf-300")}>
-            {format(anchorDate, "MMMM d")}
+            {formatInTimeZone(anchorDate, tenantTimeZone, "MMMM d")}
           </p>
         </div>
         <span className="text-xs text-ink-500 font-mono">
@@ -106,7 +121,7 @@ export function DayView({
 
           {dayEvents.map((event) => {
             const tone = EVENT_TONE[event.type];
-            const topMin = differenceInMinutes(event.startsAt, visibleStart);
+            const topMin = minutesIntoDay(event.startsAt) - VISIBLE_START_MIN;
             const heightMin = Math.max(20, differenceInMinutes(event.endsAt, event.startsAt));
             const top = Math.max(0, (topMin / 60) * HOUR_HEIGHT);
             const height = (heightMin / 60) * HOUR_HEIGHT - 4;
@@ -131,7 +146,7 @@ export function DayView({
               >
                 <div className="flex items-center gap-2 text-[10px] font-mono tracking-tight opacity-90 leading-none mb-1">
                   <Clock className="h-3 w-3" />
-                  {format(event.startsAt, "h:mm")} → {format(event.endsAt, "h:mm a")}
+                  {formatInTimeZone(event.startsAt, tenantTimeZone, "h:mm")} → {formatEventTime(event.endsAt, tenantTimeZone)}
                 </div>
                 <div className="font-bold text-sm leading-tight">{event.title}</div>
                 {height > 60 && (
@@ -152,18 +167,19 @@ export function DayView({
             );
           })}
 
-          {today && <NowMarker visibleStart={visibleStart} />}
+          {today && <NowMarker tenantTimeZone={tenantTimeZone} />}
         </div>
       </div>
     </div>
   );
 }
 
-function NowMarker({ visibleStart }: { visibleStart: Date }) {
+function NowMarker({ tenantTimeZone }: { tenantTimeZone: string }) {
   const now = new Date();
-  const minutesFromStart = differenceInMinutes(now, visibleStart);
+  const [h, m] = formatInTimeZone(now, tenantTimeZone, "HH:mm").split(":").map(Number);
+  const minutesFromStart = h * 60 + m - DAY_START_HOUR * 60;
   if (minutesFromStart < 0) return null;
-  if (now.getHours() > DAY_END_HOUR) return null;
+  if (h > DAY_END_HOUR) return null;
   const top = (minutesFromStart / 60) * HOUR_HEIGHT;
   return (
     <div className="absolute inset-x-0 pointer-events-none z-20" style={{ top }}>

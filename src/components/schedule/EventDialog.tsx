@@ -40,6 +40,7 @@ import {
 } from "@/actions/attendance";
 import { ALL_EVENT_TYPES, EVENT_TONE } from "@/lib/eventTone";
 import { cn, getInitials } from "@/lib/utils";
+import { toTenantLocalIsoMinute, fromTenantLocalIsoMinute } from "@/lib/datetime";
 import {
   Loader2,
   Trash2,
@@ -80,13 +81,8 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-function toLocalIsoMinute(date: Date) {
-  const tzOffsetMs = date.getTimezoneOffset() * 60 * 1000;
-  return new Date(date.getTime() - tzOffsetMs).toISOString().slice(0, 16);
-}
-
-function combineDateTime(dateStr: string, timeStr: string) {
-  return new Date(`${dateStr}T${timeStr}:00`);
+function combineDateTime(dateStr: string, timeStr: string, timeZone: string) {
+  return fromTenantLocalIsoMinute(`${dateStr}T${timeStr}`, timeZone);
 }
 
 type AttendanceEntry = {
@@ -110,6 +106,7 @@ const CYCLE: AttendanceStatus[] = ["PRESENT", "LATE", "ABSENT", "EXCUSED"];
 export function EventDialog({
   tenantId,
   tenantSlug,
+  tenantTimeZone,
   event,
   defaultStart,
   defaultEnd,
@@ -119,6 +116,7 @@ export function EventDialog({
 }: {
   tenantId: string;
   tenantSlug?: string;
+  tenantTimeZone: string;
   event?: Event;
   defaultStart?: Date;
   defaultEnd?: Date;
@@ -148,9 +146,9 @@ export function EventDialog({
     defaultValues: {
       title: event?.title ?? "",
       type: (event?.type as EventType) ?? "PRACTICE",
-      date: toLocalIsoMinute(start).slice(0, 10),
-      startTime: toLocalIsoMinute(start).slice(11, 16),
-      endTime: toLocalIsoMinute(end).slice(11, 16),
+      date: toTenantLocalIsoMinute(start, tenantTimeZone).slice(0, 10),
+      startTime: toTenantLocalIsoMinute(start, tenantTimeZone).slice(11, 16),
+      endTime: toTenantLocalIsoMinute(end, tenantTimeZone).slice(11, 16),
       locationId: event?.locationId ?? "",
       capacity: event?.capacity?.toString() ?? "",
       recurrenceEnabled: false,
@@ -176,8 +174,8 @@ export function EventDialog({
   function runSave(data: FormData, scope: SeriesScope) {
     startTransition(async () => {
       try {
-        const startsAt = combineDateTime(data.date, data.startTime).toISOString();
-        const endsAt = combineDateTime(data.date, data.endTime).toISOString();
+        const startsAt = combineDateTime(data.date, data.startTime, tenantTimeZone).toISOString();
+        const endsAt = combineDateTime(data.date, data.endTime, tenantTimeZone).toISOString();
 
         if (isEdit) {
           const result = await updateEventAction({

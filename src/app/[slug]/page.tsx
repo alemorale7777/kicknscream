@@ -10,6 +10,8 @@ import { Wordmark } from "@/components/brand/Wordmark";
 import { ServiceCatalog } from "@/components/book/ServiceCatalog";
 import { EVENT_TONE } from "@/lib/eventTone";
 import { format, addDays } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
+import { formatEventShort } from "@/lib/datetime";
 import {
   MapPin,
   Calendar,
@@ -349,8 +351,8 @@ export default async function PublicTenantPage({
                   className="p-4 flex items-center gap-4 hover:border-turf-400/40 transition-colors"
                 >
                   <div className="text-center w-14 shrink-0 border-r border-line pr-3 font-mono">
-                    <p className="text-[10px] uppercase tracking-wider text-ink-500">{format(e.startsAt, "MMM")}</p>
-                    <p className="text-2xl font-bold leading-none mt-0.5">{format(e.startsAt, "d")}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-ink-500">{formatInTimeZone(e.startsAt, tenant.timeZone ?? "America/Los_Angeles", "MMM")}</p>
+                    <p className="text-2xl font-bold leading-none mt-0.5">{formatInTimeZone(e.startsAt, tenant.timeZone ?? "America/Los_Angeles", "d")}</p>
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -365,7 +367,7 @@ export default async function PublicTenantPage({
                     <div className="flex items-center gap-3 text-xs text-ink-500 mt-1">
                       <span className="inline-flex items-center gap-1">
                         <Clock className="h-3 w-3" />
-                        {format(e.startsAt, "EEE h:mm a")}
+                        {formatEventShort(e.startsAt, tenant.timeZone ?? "America/Los_Angeles")}
                       </span>
                       {e.location && (
                         <span className="inline-flex items-center gap-1">

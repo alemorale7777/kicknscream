@@ -35,12 +35,14 @@ type ViewMode = "week" | "month" | "day";
 export function ScheduleClient({
   tenantId,
   tenantSlug,
+  tenantTimeZone,
   events,
   locations,
   canEdit,
 }: {
   tenantId: string;
   tenantSlug: string;
+  tenantTimeZone: string;
   events: EventWithLocation[];
   locations: Location[];
   canEdit: boolean;
@@ -232,6 +234,7 @@ export function ScheduleClient({
         {view === "week" && (
           <WeekView
             tenantId={tenantId}
+            tenantTimeZone={tenantTimeZone}
             anchorDate={anchorDate}
             events={filteredEvents}
             locations={locations}
@@ -242,6 +245,7 @@ export function ScheduleClient({
         )}
         {view === "month" && (
           <MonthView
+            tenantTimeZone={tenantTimeZone}
             anchorDate={anchorDate}
             events={filteredEvents}
             canEdit={canEdit}
@@ -251,6 +255,7 @@ export function ScheduleClient({
         )}
         {view === "day" && (
           <DayView
+            tenantTimeZone={tenantTimeZone}
             anchorDate={anchorDate}
             events={filteredEvents}
             canEdit={canEdit}
@@ -284,6 +289,7 @@ export function ScheduleClient({
         key={editingEvent?.id ?? "new"}
         tenantId={tenantId}
         tenantSlug={tenantSlug}
+        tenantTimeZone={tenantTimeZone}
         event={editingEvent}
         defaultStart={defaultRange?.start}
         defaultEnd={defaultRange?.end}

@@ -38,6 +38,7 @@ export default async function SchedulePage({ params }: { params: Promise<{ slug:
       <ScheduleClient
         tenantId={tenant.id}
         tenantSlug={tenant.slug}
+        tenantTimeZone={tenant.timeZone ?? "America/Los_Angeles"}
         events={events}
         locations={locations}
         canEdit={canEdit}

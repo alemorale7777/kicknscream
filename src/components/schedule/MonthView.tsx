@@ -10,22 +10,24 @@ import {
   format,
   isSameMonth,
   isToday,
-  startOfDay,
   startOfMonth,
   startOfWeek,
 } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import type { Event, Location } from "@prisma/client";
 
 type EventWithLocation = Event & { location?: Location | null };
 
 export function MonthView({
   anchorDate,
+  tenantTimeZone,
   events,
   canEdit,
   onDayClick,
   onEventClick,
 }: {
   anchorDate: Date;
+  tenantTimeZone: string;
   events: EventWithLocation[];
   canEdit: boolean;
   onDayClick: (date: Date) => void;
@@ -49,7 +51,7 @@ export function MonthView({
   const eventsByDay = useMemo(() => {
     const map = new Map<string, EventWithLocation[]>();
     for (const e of events) {
-      const key = startOfDay(e.startsAt).toDateString();
+      const key = formatInTimeZone(e.startsAt, tenantTimeZone, "yyyy-MM-dd");
       const arr = map.get(key) ?? [];
       arr.push(e);
       map.set(key, arr);
@@ -59,7 +61,7 @@ export function MonthView({
       arr.sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
     }
     return map;
-  }, [events]);
+  }, [events, tenantTimeZone]);
 
   return (
     <div className="rounded-lg border border-line bg-pitch-800 overflow-hidden">
@@ -76,7 +78,7 @@ export function MonthView({
 
       <div className="grid grid-cols-7 auto-rows-fr">
         {days.map((day) => {
-          const dayKey = day.toDateString();
+          const dayKey = formatInTimeZone(day, tenantTimeZone, "yyyy-MM-dd");
           const dayEvents = eventsByDay.get(dayKey) ?? [];
           const inMonth = isSameMonth(day, anchorDate);
           const today = isToday(day);
@@ -130,7 +132,7 @@ export function MonthView({
                         className="h-1.5 w-1.5 rounded-full shrink-0"
                         style={{ backgroundColor: tone.accent }}
                       />
-                      <span className="font-mono text-[9px] opacity-80 shrink-0">{format(e.startsAt, "HHmm")}</span>
+                      <span className="font-mono text-[9px] opacity-80 shrink-0">{formatInTimeZone(e.startsAt, tenantTimeZone, "HHmm")}</span>
                       <span className="truncate font-medium">{e.title}</span>
                     </div>
                   );
