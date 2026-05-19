@@ -222,6 +222,50 @@ export default async function PlayerProfilePage({
       {/* Tab content */}
       <div className="min-h-[200px]">
         {activeTab === "overview" && (
+          <div className="space-y-4">
+            {(() => {
+              const activePacks = player.enrollments.filter(
+                (e) =>
+                  e.program?.priceModel === "PACKAGE" &&
+                  e.program?.packSize &&
+                  e.packBalance !== null &&
+                  e.status !== "COMPLETED" &&
+                  e.status !== "REFUNDED" &&
+                  e.status !== "CANCELED"
+              );
+              if (activePacks.length === 0) return null;
+              return (
+                <section className="space-y-2">
+                  <h2 className="text-xs uppercase tracking-[0.2em] text-ink-500">
+                    Active packs
+                  </h2>
+                  <div className="space-y-2">
+                    {activePacks.map((e) => {
+                      const balance = e.packBalance ?? 0;
+                      const size = e.program!.packSize!;
+                      const pct = (balance / size) * 100;
+                      return (
+                        <Card key={e.id} className="p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="font-medium text-ink-50">{e.program!.name}</p>
+                            <span className="font-mono text-sm text-turf-300">
+                              {balance}/{size} left
+                            </span>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-pitch-700 overflow-hidden">
+                            <div
+                              className="h-full bg-turf-400 transition-all"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </section>
+              );
+            })()}
+
           <Card>
             <CardContent className="p-5 space-y-4">
               <Field label="Date of birth" value={format(player.dob, "MMM d, yyyy")} />
@@ -245,6 +289,7 @@ export default async function PlayerProfilePage({
               )}
             </CardContent>
           </Card>
+          </div>
         )}
 
         {activeTab === "schedule" && (
