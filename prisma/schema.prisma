@@ -24,6 +24,7 @@ model User {
   memberships   Membership[]
   sessions      Session[]
   accounts      Account[]
+  parent        Parent?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 }
@@ -126,6 +127,7 @@ model Tenant {
   auditEntries            AuditLog[]
   permissionsOverrides    PermissionsOverride[]
   bookingDrafts           BookingDraft[]
+  tenantParents           TenantParent[]
   createdAt               DateTime              @default(now())
   updatedAt               DateTime              @updatedAt
 }
@@ -274,6 +276,8 @@ model Player {
   lastName         String
   dob              DateTime
   parentId         String?
+  parentRefId      String?
+  parentRef        Parent?           @relation("PlayerToParent", fields: [parentRefId], references: [id], onDelete: SetNull)
   // Legacy single-position field (kept for compat); use positions[] for new code
   position         String?
   positions        String[]          @default([])
@@ -297,12 +301,14 @@ model Player {
 // primary parent for compat with existing code; ParentPlayer represents
 // additional guardians (co-parent, grandparent, etc.).
 model ParentPlayer {
-  id           String   @id @default(cuid())
-  parentUserId String
-  playerId     String
-  relationship String   @default("parent")
-  createdAt    DateTime @default(now())
-  player       Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  id             String   @id @default(cuid())
+  parentUserId   String
+  playerId       String
+  relationship   String   @default("parent")
+  parentRefId    String?
+  parentRef      Parent?  @relation("ParentPlayerToParent", fields: [parentRefId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+  player         Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
 
   @@unique([parentUserId, playerId])
   @@index([parentUserId])
@@ -587,14 +593,14 @@ model File {
 
 model AuditLog {
   id          String   @id @default(cuid())
-  tenantId    String
+  tenantId    String?
   actorUserId String?
   action      String
   targetType  String?
   targetId    String?
   diff        Json?
   createdAt   DateTime @default(now())
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant      Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, createdAt(sort: Desc)])
   @@index([targetType, targetId])
@@ -670,4 +676,47 @@ model BookingDraft {
   @@index([tenantId, startsAt])
   @@index([programId, expiresAt])
   @@index([email])
+}
+
+// =====================================================================
+// PARENT / CUSTOMER MODEL (additive — see docs/superpowers/plans/2026-05-19-parent-customer-model-split.md)
+// =====================================================================
+
+model Parent {
+  id          String         @id @default(cuid())
+  email       String         @unique
+  name        String?
+  phone       String?
+  userId      String?        @unique
+  user        User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  tenantLinks TenantParent[]
+  players     Player[]       @relation("PlayerToParent")
+  guardianships ParentPlayer[] @relation("ParentPlayerToParent")
+  deletedAt   DateTime?
+  pendingDeletionRequestedAt DateTime?
+  pendingDeletionToken       String?   @unique
+  pendingDeletionRequestedBy String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([email])
+}
+
+model TenantParent {
+  tenantId     String
+  parentId     String
+  status       TenantParentStatus @default(ACTIVE)
+  notes        String?
+  registeredAt DateTime           @default(now())
+  revokedAt    DateTime?
+  tenant       Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  parent       Parent             @relation(fields: [parentId], references: [id], onDelete: Cascade)
+
+  @@id([tenantId, parentId])
+  @@index([parentId])
+}
+
+enum TenantParentStatus {
+  ACTIVE
+  REVOKED
 }
