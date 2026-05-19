@@ -5,9 +5,136 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/tenant";
 import { hasRole } from "@/lib/roles";
+import { computePackDelta } from "@/lib/packBalance";
 import type { AttendanceStatus } from "@prisma/client";
 
 const STATUSES = ["PRESENT", "ABSENT", "LATE", "EXCUSED", "PENDING"] as const;
+
+/**
+ * Adjust the matching PACKAGE enrollment's packBalance based on a
+ * status transition. Inputs are the new state we're writing + the prior
+ * state we just read from the DB (null if the Attendance row didn't
+ * exist yet).
+ *
+ * Atomic with respect to other concurrent writes via a conditional
+ * update guarded on the current balance — if two coaches mark the
+ * same player PRESENT at the same time, only the first decrement
+ * lands. Also auto-completes the enrollment + fires the pack-
+ * finished email when balance hits 0.
+ */
+async function adjustPackBalanceForAttendance(opts: {
+  tenantId: string;
+  playerId: string;
+  eventId: string;
+  prev: AttendanceStatus | null;
+  next: AttendanceStatus;
+}) {
+  const delta = computePackDelta(opts.prev, opts.next);
+  if (delta === 0) return;
+
+  // Find the event's program and the player's active PACKAGE enrollment
+  // for it. If the program isn't PACKAGE or there's no matching
+  // enrollment, no-op.
+  const event = await db.event.findUnique({
+    where: { id: opts.eventId },
+    select: { programId: true },
+  });
+  if (!event?.programId) return;
+
+  const enrollment = await db.enrollment.findFirst({
+    where: {
+      playerId: opts.playerId,
+      programId: event.programId,
+      status: { in: ["ACTIVE", "CONFIRMED", "PAID", "COMPLETED"] },
+      program: { priceModel: "PACKAGE" },
+    },
+    include: {
+      program: { select: { id: true, name: true, packSize: true } },
+      player: { select: { firstName: true, lastName: true, parentId: true } },
+    },
+  });
+  if (!enrollment || enrollment.packBalance === null) return;
+
+  if (delta === -1) {
+    // Conditional decrement — only succeeds if balance > 0 (prevents
+    // double-spend on concurrent marks).
+    const result = await db.enrollment.updateMany({
+      where: { id: enrollment.id, packBalance: { gt: 0 } },
+      data: { packBalance: { decrement: 1 } },
+    });
+    if (result.count === 0) return; // already at 0; nothing to consume
+
+    await db.auditLog.create({
+      data: {
+        tenantId: opts.tenantId,
+        actorUserId: null,
+        action: "enrollment.pack_consumed",
+        targetType: "Enrollment",
+        diff: { enrollmentId: enrollment.id, programId: enrollment.programId },
+      },
+    });
+
+    // If that decrement just hit 0, auto-complete + send the nudge email.
+    const fresh = await db.enrollment.findUnique({
+      where: { id: enrollment.id },
+      select: { packBalance: true, status: true },
+    });
+    if (fresh?.packBalance === 0 && fresh.status !== "COMPLETED") {
+      await db.enrollment.update({
+        where: { id: enrollment.id },
+        data: { status: "COMPLETED" },
+      });
+      await db.auditLog.create({
+        data: {
+          tenantId: opts.tenantId,
+          actorUserId: null,
+          action: "enrollment.pack_completed",
+          targetType: "Enrollment",
+          diff: { enrollmentId: enrollment.id, programId: enrollment.programId },
+        },
+      });
+      // Fetch parent user separately — Player.parentId is a String, not a relation.
+      if (enrollment.player.parentId && enrollment.program.packSize) {
+        const parent = await db.user.findUnique({
+          where: { id: enrollment.player.parentId },
+          select: { email: true, name: true },
+        });
+        const tenant = await db.tenant.findUnique({
+          where: { id: opts.tenantId },
+          select: { name: true, slug: true },
+        });
+        if (parent?.email && tenant) {
+          const { sendPackCompletedEmail } = await import("@/lib/email");
+          await sendPackCompletedEmail({
+            to: parent.email,
+            parentName: parent.name ?? "there",
+            tenantName: tenant.name,
+            tenantSlug: tenant.slug,
+            programName: enrollment.program.name,
+            programId: enrollment.program.id,
+            packSize: enrollment.program.packSize,
+          }).catch(() => {
+            // Best-effort — email failure shouldn't block the mark.
+          });
+        }
+      }
+    }
+  } else {
+    // Increment back. Cap at packSize (defensive — shouldn't ever exceed).
+    await db.enrollment.update({
+      where: { id: enrollment.id },
+      data: {
+        packBalance: Math.min(
+          (enrollment.packBalance ?? 0) + 1,
+          enrollment.program.packSize ?? Number.MAX_SAFE_INTEGER
+        ),
+        // If we're re-opening a COMPLETED-via-zero enrollment, flip it back.
+        status:
+          enrollment.status === "COMPLETED" ? "ACTIVE" : enrollment.status,
+      },
+    });
+  }
+}
 
 const markSchema = z.object({
   tenantId: z.string(),
@@ -30,6 +157,14 @@ export async function markAttendanceAction(input: z.infer<typeof markSchema>) {
   const data = markSchema.parse(input);
   const { user, membership } = await assertCanMark(data.tenantId);
 
+  // Read current status so the pack-balance adjuster can compute the
+  // delta. Safe under concurrent writes — the adjuster's update is
+  // conditional on packBalance > 0.
+  const existing = await db.attendance.findUnique({
+    where: { eventId_playerId: { eventId: data.eventId, playerId: data.playerId } },
+    select: { status: true },
+  });
+
   await db.attendance.upsert({
     where: { eventId_playerId: { eventId: data.eventId, playerId: data.playerId } },
     create: {
@@ -44,6 +179,16 @@ export async function markAttendanceAction(input: z.infer<typeof markSchema>) {
       checkedInAt: data.status === "PRESENT" || data.status === "LATE" ? new Date() : null,
       checkedInBy: user.id,
     },
+  });
+
+  await adjustPackBalanceForAttendance({
+    tenantId: data.tenantId,
+    playerId: data.playerId,
+    eventId: data.eventId,
+    prev: existing?.status ?? null,
+    next: data.status as AttendanceStatus,
+  }).catch(() => {
+    // Best-effort — balance adjustment failure shouldn't roll back the mark.
   });
 
   if (membership.tenant) {
@@ -178,6 +323,20 @@ export async function markSeriesAttendanceAction(
         })
       )
     );
+    // Pack-balance adjustment per (event × player). The series sweep
+    // only ever creates fresh Attendance rows (it skips events that
+    // already have any attendance), so `prev` is always null here.
+    for (const playerId of playerIds) {
+      await adjustPackBalanceForAttendance({
+        tenantId: data.tenantId,
+        playerId,
+        eventId: event.id,
+        prev: null,
+        next: status,
+      }).catch(() => {
+        // Best-effort — don't poison the sweep.
+      });
+    }
     eventsWritten++;
     rowsWritten += playerIds.length;
   }
@@ -195,6 +354,17 @@ export async function bulkMarkAttendanceAction(input: z.infer<typeof bulkSchema>
   const status = data.status as AttendanceStatus;
   const at = status === "PRESENT" || status === "LATE" ? new Date() : null;
 
+  // Snapshot existing statuses so the pack-balance adjuster has a `prev`
+  // for each player.
+  const existing = await db.attendance.findMany({
+    where: {
+      eventId: data.eventId,
+      playerId: { in: data.playerIds },
+    },
+    select: { playerId: true, status: true },
+  });
+  const prevByPlayer = new Map(existing.map((a) => [a.playerId, a.status]));
+
   await db.$transaction(
     data.playerIds.map((playerId) =>
       db.attendance.upsert({
@@ -204,6 +374,20 @@ export async function bulkMarkAttendanceAction(input: z.infer<typeof bulkSchema>
       })
     )
   );
+
+  // Adjust packs sequentially — each call is independent and we don't
+  // want a single failing adjustment to roll back the entire bulk mark.
+  for (const playerId of data.playerIds) {
+    await adjustPackBalanceForAttendance({
+      tenantId: data.tenantId,
+      playerId,
+      eventId: data.eventId,
+      prev: prevByPlayer.get(playerId) ?? null,
+      next: status,
+    }).catch(() => {
+      // Best-effort — log and move on.
+    });
+  }
 
   if (membership.tenant) {
     revalidatePath(`/t/${membership.tenant.slug}/coach/schedule/${data.eventId}`);
