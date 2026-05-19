@@ -92,6 +92,150 @@ export async function voidInvoiceAction(input: z.infer<typeof voidSchema>) {
   revalidatePath(`/t/${membership.tenant.slug}/coach/payments`);
 }
 
+const refundReasonEnum = z.enum(["duplicate", "fraudulent", "requested_by_customer"]);
+
+const refundSchema = z.object({
+  tenantId: z.string(),
+  invoiceId: z.string(),
+  amountCents: z.number().int().positive().optional(),
+  reason: refundReasonEnum.optional(),
+  notes: z.string().max(500).optional(),
+});
+
+/**
+ * Issue a refund against a paid invoice. Two code paths:
+ *  - Stripe-paid invoice (stripePaymentIntentId set): hits
+ *    stripe.refunds.create on the connected account.
+ *  - Manually-recorded payment: skips Stripe, just marks the invoice
+ *    voided and writes a negative Payment row.
+ *
+ * Idempotent against the existing charge.refunded webhook — the
+ * webhook does a conditional update that becomes a no-op once this
+ * action has already moved the invoice to VOIDED.
+ */
+export async function refundInvoiceAction(
+  input: z.infer<typeof refundSchema>
+): Promise<void> {
+  const data = refundSchema.parse(input);
+  const { user, membership } = await assertCanManage(data.tenantId);
+  if (!membership.tenant) throw new Error("Tenant not found");
+
+  const invoice = await db.invoice.findUnique({
+    where: { id: data.invoiceId },
+    include: {
+      payments: true,
+      tenant: true,
+      enrollments: { include: { program: true } },
+    },
+  });
+  if (!invoice || invoice.tenantId !== data.tenantId) {
+    throw new Error("Invoice not found");
+  }
+  if (invoice.status === "VOIDED") throw new Error("Invoice is already voided");
+
+  const paidSoFar = invoice.payments.reduce((acc, p) => acc + p.amount, 0);
+  if (paidSoFar <= 0) throw new Error("Nothing paid on this invoice to refund");
+
+  const refundAmount = data.amountCents ?? paidSoFar;
+  if (refundAmount > paidSoFar) {
+    throw new Error(
+      `Refund amount (${(refundAmount / 100).toFixed(2)}) exceeds paid balance (${(paidSoFar / 100).toFixed(2)})`
+    );
+  }
+
+  let stripeRefundId: string | null = null;
+  if (
+    invoice.stripePaymentIntentId &&
+    stripeEnabled() &&
+    invoice.tenant.stripeAccountId
+  ) {
+    const stripe = getStripe();
+    const refund = await stripe.refunds.create(
+      {
+        payment_intent: invoice.stripePaymentIntentId,
+        amount: refundAmount,
+        reason: data.reason,
+      },
+      { stripeAccount: invoice.tenant.stripeAccountId }
+    );
+    stripeRefundId = refund.id;
+  }
+
+  // Pick a sensible method for the negative Payment row — latest
+  // positive payment's method, defaulting to CARD.
+  const lastPositive = [...invoice.payments]
+    .filter((p) => p.amount > 0)
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+  const method: PaymentMethod = (lastPositive?.method ?? "CARD") as PaymentMethod;
+
+  const fullRefund = refundAmount >= paidSoFar;
+
+  await db.$transaction([
+    db.payment.create({
+      data: {
+        invoiceId: invoice.id,
+        amount: -refundAmount,
+        method,
+        reference: stripeRefundId,
+        recordedBy: user.id,
+      },
+    }),
+    ...(fullRefund
+      ? [
+          db.invoice.update({
+            where: { id: invoice.id },
+            data: { status: "VOIDED" },
+          }),
+          db.enrollment.updateMany({
+            where: { invoiceId: invoice.id, status: { not: "REFUNDED" } },
+            data: { status: "REFUNDED", cancellationReason: data.reason ?? "refund" },
+          }),
+        ]
+      : []),
+  ]);
+
+  await db.auditLog.create({
+    data: {
+      tenantId: data.tenantId,
+      actorUserId: user.id,
+      action: "payment.refund",
+      targetType: "Invoice",
+      diff: {
+        invoiceId: invoice.id,
+        amountCents: refundAmount,
+        fullRefund,
+        reason: data.reason ?? null,
+        notes: data.notes ?? null,
+        viaStripe: !!stripeRefundId,
+      },
+    },
+  });
+
+  // Resolve parent display name from the payer's User row when possible.
+  const payer = await db.user.findFirst({
+    where: { email: invoice.payerEmail },
+    select: { name: true },
+  });
+  const programName = invoice.enrollments[0]?.program?.name ?? null;
+  const { sendRefundConfirmation } = await import("@/lib/email");
+  await sendRefundConfirmation({
+    to: invoice.payerEmail,
+    parentName: payer?.name ?? "there",
+    tenantName: invoice.tenant.name,
+    tenantSlug: invoice.tenant.slug,
+    programName,
+    amountCents: refundAmount,
+    fullRefund,
+    reason: data.reason ?? null,
+  }).catch(() => {
+    // Best-effort — refund succeeded even if email failed.
+  });
+
+  revalidatePath(`/t/${membership.tenant.slug}/coach/payments`);
+  revalidatePath(`/t/${membership.tenant.slug}/admin/audit`);
+  revalidatePath(`/t/${membership.tenant.slug}/family/pay`);
+}
+
 const parentPaySchema = z.object({ invoiceId: z.string() });
 
 /**
