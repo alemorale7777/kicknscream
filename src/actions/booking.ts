@@ -9,7 +9,7 @@ import { sendBookingConfirmation } from "@/lib/email";
 import { stripeEnabled, getStripe } from "@/lib/stripe";
 import { normalizeEmail, normalizePhone, matchParent } from "@/lib/parent-link";
 import { fromTenantLocalIsoMinute } from "@/lib/datetime";
-import { findOrCreateParent } from "@/lib/parents";
+import { findOrCreateParent, issueClaimToken } from "@/lib/parents";
 import { formatInTimeZone } from "date-fns-tz";
 import { addDays } from "date-fns";
 import { logAudit } from "@/lib/audit";
@@ -307,6 +307,22 @@ export async function createBookingAction(input: BookingInput) {
     data: { claimedAt: new Date() },
   });
 
+  // Magic-link claim CTA — only when the Parent row has no User attached
+  // yet (i.e. the parent has not signed in / claimed via this flow yet).
+  // Flag-off mode skips this entirely because the legacy User upsert above
+  // already authenticates the parent identity, so there is nothing to
+  // claim.
+  let claimUrl: string | undefined;
+  if (parentModelV2Shadow() && parentRefId) {
+    const parentRow = await db.parent.findUniqueOrThrow({
+      where: { id: parentRefId },
+    });
+    if (!parentRow.userId) {
+      const token = await issueClaimToken(db, parentRefId);
+      claimUrl = `${env.NEXTAUTH_URL}/claim/${token}`;
+    }
+  }
+
   // Free program → finalize, send email, redirect to confirmation
   if (program.priceModel === "FREE" || program.price === 0) {
     await sendBookingConfirmation({
@@ -319,6 +335,7 @@ export async function createBookingAction(input: BookingInput) {
       endsAt,
       amountCents: 0,
       timeZone: tenant.timeZone ?? undefined,
+      claimUrl,
     }).catch(() => {
       // Best-effort — don't block redirect on email failure
     });
@@ -414,6 +431,7 @@ export async function createBookingAction(input: BookingInput) {
     amountCents: program.price,
     pendingPayment: true,
     timeZone: tenant.timeZone ?? undefined,
+    claimUrl,
   }).catch(() => {});
 
   redirect(`/${tenant.slug}/book/success?invoice=${invoice.id}&pending=1`);

@@ -28,6 +28,7 @@ export async function sendBookingConfirmation(opts: {
   amountCents: number;
   pendingPayment?: boolean;
   timeZone?: string;
+  claimUrl?: string;
 }) {
   const resend = new Resend(env.AUTH_RESEND_KEY);
   const tz = opts.timeZone ?? DEFAULT_TZ;
@@ -45,6 +46,17 @@ export async function sendBookingConfirmation(opts: {
       : `<div style="border:1px solid rgba(31,182,99,0.4);background:rgba(31,182,99,0.1);color:#4DDF8A;border-radius:8px;padding:14px;margin:16px 0;font-size:13px;">
           You're all set — no payment required.
         </div>`;
+
+  const claimBlock = opts.claimUrl
+    ? `<div style="margin:24px 0;text-align:center;">
+        <a href="${escapeHtml(opts.claimUrl)}" style="display:inline-block;padding:12px 24px;background:#1FB663;color:#050A07;border-radius:8px;font-weight:600;text-decoration:none;">
+          Claim your family portal
+        </a>
+        <p style="margin:8px 0 0;font-size:12px;color:#94A39B;">
+          See past sessions and pay invoices in one place.
+        </p>
+      </div>`
+    : "";
 
   const html = `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><title>Booking confirmed</title></head>
@@ -72,6 +84,8 @@ export async function sendBookingConfirmation(opts: {
       </div>
 
       ${statusBlock}
+
+      ${claimBlock}
 
       <p style="margin:16px 0 0;color:#94A39B;font-size:12px;line-height:1.6;">
         Need to change something? Reply to this email and ${escapeHtml(opts.tenantName)} will help.

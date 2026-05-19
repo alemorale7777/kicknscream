@@ -1,6 +1,9 @@
+import { randomBytes } from "node:crypto";
 import type { Parent, Prisma, PrismaClient, TenantParent } from "@prisma/client";
 
 type Db = PrismaClient | Prisma.TransactionClient;
+
+const CLAIM_TOKEN_TTL_DAYS = 30;
 
 export type FindOrCreateParentInput = {
   tenantId: string;
@@ -231,4 +234,55 @@ export async function mergeParents(
       tenantsCollapsed,
     };
   });
+}
+
+/**
+ * Mint a claim token for a Parent. The token is a URL-safe random string
+ * embedded in the magic claim link sent in the booking confirmation email.
+ * Overwrites any prior un-consumed token — the most recently issued link
+ * wins, which matches the user's mental model ("the latest email is the
+ * one that works").
+ */
+export async function issueClaimToken(
+  db: Db,
+  parentId: string
+): Promise<string> {
+  const token = randomBytes(24).toString("base64url");
+  const expiresAt = new Date(Date.now() + CLAIM_TOKEN_TTL_DAYS * 86400 * 1000);
+  await db.parent.update({
+    where: { id: parentId },
+    data: { claimToken: token, claimTokenExpiresAt: expiresAt },
+  });
+  return token;
+}
+
+/**
+ * Consume a claim token: look up the Parent, verify the token is not
+ * expired, and attach the given userId. Returns null when the token is
+ * unknown or expired so the caller can route to /claim/expired without
+ * leaking which case it was.
+ *
+ * Clears claimToken + claimTokenExpiresAt on success so the same link can
+ * only be redeemed once.
+ */
+export async function consumeClaimToken(
+  db: Db,
+  args: { token: string; userId: string }
+): Promise<{ parent: Parent } | null> {
+  const parent = await db.parent.findUnique({
+    where: { claimToken: args.token },
+  });
+  if (!parent) return null;
+  if (parent.claimTokenExpiresAt && parent.claimTokenExpiresAt < new Date()) {
+    return null;
+  }
+  const updated = await db.parent.update({
+    where: { id: parent.id },
+    data: {
+      userId: args.userId,
+      claimToken: null,
+      claimTokenExpiresAt: null,
+    },
+  });
+  return { parent: updated };
 }
