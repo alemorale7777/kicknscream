@@ -118,6 +118,7 @@ model Tenant {
   files                   File[]
   auditEntries            AuditLog[]
   permissionsOverrides    PermissionsOverride[]
+  bookingDrafts           BookingDraft[]
   createdAt               DateTime              @default(now())
   updatedAt               DateTime              @updatedAt
 }
@@ -215,6 +216,7 @@ model Program {
   stripePriceId     String?
   events            Event[]
   enrollments       Enrollment[]
+  bookingDrafts     BookingDraft[]
   tenant            Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
@@ -634,4 +636,25 @@ model UserPreferences {
   calendarToken  String?  @unique
   updatedAt      DateTime @updatedAt
   createdAt      DateTime @default(now())
+}
+
+model BookingDraft {
+  id         String   @id @default(cuid())
+  tenantId   String
+  programId  String
+  email      String
+  token      String   @unique
+  startsAt   DateTime
+  endsAt     DateTime
+  payload    Json
+  expiresAt  DateTime
+  claimedAt  DateTime?
+  createdAt  DateTime @default(now())
+
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  program    Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, startsAt])
+  @@index([programId, expiresAt])
+  @@index([email])
 }
