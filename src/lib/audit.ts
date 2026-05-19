@@ -1,4 +1,6 @@
+import { createHmac } from "node:crypto";
 import { db } from "@/lib/db";
+import { env } from "@/lib/env";
 
 /**
  * Canonical action names. Centralized so the /admin/audit UI and any future
@@ -63,4 +65,20 @@ export async function logAudit(input: {
       err,
     });
   }
+}
+
+/**
+ * HMAC-SHA256 of a normalized email, truncated to 16 hex chars. Used in
+ * audit-log diffs so audit rows never contain re-identifiable PII (an
+ * attacker who exfiltrates the audit table cannot brute-force common emails
+ * without also having the server-side AUDIT_EMAIL_HMAC_SECRET).
+ *
+ * Deterministic — given the same input + secret, always returns the same
+ * hash. Investigators can rehash a known email and search for matches.
+ */
+export function emailHash(email: string): string {
+  return createHmac("sha256", env.AUDIT_EMAIL_HMAC_SECRET)
+    .update(email.trim().toLowerCase())
+    .digest("hex")
+    .slice(0, 16);
 }
