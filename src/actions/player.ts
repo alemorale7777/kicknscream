@@ -135,3 +135,21 @@ export async function deletePlayerAction(tenantId: string, playerId: string) {
   await db.player.delete({ where: { id: playerId } });
   revalidatePath(`/t/${membership.tenant.slug}/coach/roster`);
 }
+
+const clearPhotoSchema = z.object({ playerId: z.string() });
+
+export async function clearPlayerPhotoAction(
+  input: z.infer<typeof clearPhotoSchema>
+): Promise<void> {
+  const data = clearPhotoSchema.parse(input);
+  const user = await getCurrentUser();
+  if (!user) throw new Error("Not authenticated");
+  const { canEditPlayer } = await import("@/lib/canEditPlayer");
+  if (!(await canEditPlayer(user.id, data.playerId))) {
+    throw new Error("You don't have permission to edit this player");
+  }
+  await db.player.update({
+    where: { id: data.playerId },
+    data: { photoUrl: null },
+  });
+}
