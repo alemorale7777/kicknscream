@@ -43,7 +43,7 @@ export function NeedsAttention({ items }: { items: AttentionItem[] }) {
           const tone = TONE[item.tone];
           const Icon = ICONS[item.icon];
           return (
-            <Link key={item.id} href={item.href} className="block group">
+            <Link key={item.id} href={item.href} prefetch={false} className="block group">
               <Card
                 className={cn(
                   "transition-all duration-[150ms] ease-out hover:border-warn/60",

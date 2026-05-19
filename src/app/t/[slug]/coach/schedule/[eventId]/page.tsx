@@ -11,6 +11,7 @@ import { SessionNoteComposer } from "@/components/schedule/SessionNoteComposer";
 import { SessionNoteList } from "@/components/schedule/SessionNoteList";
 import { AttendanceList } from "@/components/schedule/AttendanceList";
 import { formatEventDate, formatEventTime } from "@/lib/datetime";
+import { aiEnabled } from "@/lib/ai";
 import {
   Calendar,
   Clock,
@@ -203,6 +204,7 @@ export default async function EventDetailPage({
             players={playersForComposer}
             programName={event.program?.name ?? event.title}
             eventTitle={event.title}
+            aiEnabled={aiEnabled()}
           />
         )}
 

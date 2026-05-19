@@ -28,6 +28,7 @@ export function AdminSideNav({ tenant }: { tenant: Tenant }) {
             <Link
               key={it.segment}
               href={href}
+              prefetch={false}
               className={cn(
                 "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors duration-[120ms]",
                 active
@@ -62,6 +63,7 @@ export function AdminMobileNav({ tenant }: { tenant: Tenant }) {
             <Link
               key={it.segment}
               href={href}
+              prefetch={false}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs whitespace-nowrap transition-colors duration-[120ms]",
                 active

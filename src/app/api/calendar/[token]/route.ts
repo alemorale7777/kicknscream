@@ -80,52 +80,70 @@ export async function GET(
 
   const memberships = await db.membership.findMany({
     where: { userId: prefs.userId },
-    select: { tenantId: true },
+    select: { tenantId: true, role: true },
   });
-  const tenantIds = memberships.map((m) => m.tenantId);
-  if (tenantIds.length === 0) {
-    return new NextResponse(emptyCalendar(), {
-      headers: ICS_HEADERS,
+  if (memberships.length === 0) {
+    return new NextResponse(emptyCalendar(), { headers: ICS_HEADERS });
+  }
+
+  // Tenants where this user is staff (OWNER/ADMIN/COACH) get the full
+  // event stream — owners with no linked Players used to see an empty
+  // calendar, which was the bug. Tenants where the user is PARENT/PLAYER
+  // stay scoped to the user's linked players' enrollments.
+  const staffTenantIds = memberships
+    .filter((m) => m.role === "OWNER" || m.role === "ADMIN" || m.role === "COACH")
+    .map((m) => m.tenantId);
+  const familyTenantIds = memberships
+    .filter((m) => m.role === "PARENT" || m.role === "PLAYER")
+    .map((m) => m.tenantId);
+
+  let familyProgramIds: string[] = [];
+  if (familyTenantIds.length > 0) {
+    const players = await db.player.findMany({
+      where: {
+        tenantId: { in: familyTenantIds },
+        OR: [
+          { parentId: prefs.userId },
+          { parentLinks: { some: { parentUserId: prefs.userId } } },
+        ],
+      },
+      select: { id: true },
     });
-  }
-
-  // Walk Player → Enrollment → Program → Event the same way the family
-  // home and family schedule do. The old title-match approach silently
-  // dropped every coach-created event from the parent's ICS feed.
-  const players = await db.player.findMany({
-    where: {
-      tenantId: { in: tenantIds },
-      OR: [
-        { parentId: prefs.userId },
-        { parentLinks: { some: { parentUserId: prefs.userId } } },
-      ],
-    },
-    select: { id: true },
-  });
-  if (players.length === 0) {
-    return new NextResponse(emptyCalendar(), { headers: ICS_HEADERS });
-  }
-  const playerIds = players.map((p) => p.id);
-
-  const enrollments = await db.enrollment.findMany({
-    where: {
-      playerId: { in: playerIds },
-      status: { in: ["ACTIVE", "CONFIRMED", "PAID", "PENDING"] },
-    },
-    select: { programId: true },
-  });
-  const programIds = Array.from(new Set(enrollments.map((e) => e.programId)));
-  if (programIds.length === 0) {
-    return new NextResponse(emptyCalendar(), { headers: ICS_HEADERS });
+    if (players.length > 0) {
+      const enrollments = await db.enrollment.findMany({
+        where: {
+          playerId: { in: players.map((p) => p.id) },
+          status: { in: ["ACTIVE", "CONFIRMED", "PAID", "PENDING"] },
+        },
+        select: { programId: true },
+      });
+      familyProgramIds = Array.from(new Set(enrollments.map((e) => e.programId)));
+    }
   }
 
   const windowStart = subDays(new Date(), 7);
   const windowEnd = addMonths(new Date(), 6);
 
+  // Build an OR query: ALL events for staff tenants, plus program-scoped
+  // events for family-only tenants. If neither bucket has anything the
+  // route shortcircuits to an empty calendar above.
+  const tenantClauses: { tenantId?: string | { in: string[] }; programId?: { in: string[] } }[] = [];
+  if (staffTenantIds.length > 0) {
+    tenantClauses.push({ tenantId: { in: staffTenantIds } });
+  }
+  if (familyTenantIds.length > 0 && familyProgramIds.length > 0) {
+    tenantClauses.push({
+      tenantId: { in: familyTenantIds },
+      programId: { in: familyProgramIds },
+    });
+  }
+  if (tenantClauses.length === 0) {
+    return new NextResponse(emptyCalendar(), { headers: ICS_HEADERS });
+  }
+
   const events = await db.event.findMany({
     where: {
-      tenantId: { in: tenantIds },
-      programId: { in: programIds },
+      OR: tenantClauses,
       startsAt: { gte: windowStart, lte: windowEnd },
     },
     include: {
