@@ -16,7 +16,7 @@ export default async function FamilySchedulePage({
   const { slug } = await params;
   const { tenant, user, parent } = await requireFamilyAccess(slug);
 
-  const rows = await loadUpcomingFamilyEvents(tenant.id, user.id, { parent });
+  const rows = await loadUpcomingFamilyEvents(tenant.id, user.id, { parent, tenantSlug: tenant.slug });
   const tz = tenant.timeZone ?? "America/Los_Angeles";
 
   return (

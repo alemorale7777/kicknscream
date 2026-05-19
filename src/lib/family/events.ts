@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { parentModelV2Enabled } from "@/lib/env";
+import { parentModelV2Enabled, parentModelV2EnabledFor } from "@/lib/env";
 import type { Parent } from "@prisma/client";
 
 /**
@@ -20,17 +20,21 @@ import type { Parent } from "@prisma/client";
 export async function loadUpcomingFamilyEvents(
   tenantId: string,
   parentUserId: string,
-  opts: { limit?: number; since?: Date; parent?: Parent | null } = {}
+  opts: { limit?: number; since?: Date; parent?: Parent | null; tenantSlug?: string } = {}
 ) {
   const limit = opts.limit ?? 50;
   const since = opts.since ?? new Date();
   const parent = opts.parent ?? null;
 
   // Player set — branch on parent-model-v2:
-  //   - flag ON + Parent row: scope by parentRefId (canonical link to Parent.id)
-  //   - flag OFF or no Parent: legacy parentId (User.id) + ParentPlayer junction
+  //   - flag ON (global) or per-tenant override + Parent row: scope by
+  //     parentRefId (canonical link to Parent.id)
+  //   - otherwise: legacy parentId (User.id) + ParentPlayer junction
+  const v2 = opts.tenantSlug
+    ? parentModelV2EnabledFor(opts.tenantSlug)
+    : parentModelV2Enabled();
   const playerWhere =
-    parentModelV2Enabled() && parent
+    v2 && parent
       ? { tenantId, parentRefId: parent.id }
       : {
           tenantId,

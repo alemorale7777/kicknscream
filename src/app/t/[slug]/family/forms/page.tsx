@@ -1,6 +1,6 @@
 import { requireFamilyAccess } from "@/lib/tenant";
 import { db } from "@/lib/db";
-import { parentModelV2Enabled } from "@/lib/env";
+import { parentModelV2EnabledFor } from "@/lib/env";
 import { PageHeader } from "@/components/chrome/PageHeader";
 import { Card } from "@/components/ui/card";
 import { WaiverList } from "@/components/family/WaiverList";
@@ -17,7 +17,7 @@ export default async function FamilyFormsPage({
   const { tenant, user, parent } = await requireFamilyAccess(slug);
 
   const playerWhere =
-    parentModelV2Enabled() && parent
+    parentModelV2EnabledFor(tenant.slug) && parent
       ? { tenantId: tenant.id, parentRefId: parent.id }
       : {
           tenantId: tenant.id,

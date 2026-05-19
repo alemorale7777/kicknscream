@@ -1,6 +1,6 @@
 import { requireFamilyAccess } from "@/lib/tenant";
 import { db } from "@/lib/db";
-import { parentModelV2Enabled } from "@/lib/env";
+import { parentModelV2EnabledFor } from "@/lib/env";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
@@ -31,7 +31,7 @@ export default async function FamilyKidPage({
   // legacy parentId pointer + ParentPlayer junction.
   const linked =
     !!player &&
-    (parentModelV2Enabled() && parent
+    (parentModelV2EnabledFor(tenant.slug) && parent
       ? player.parentRefId === parent.id
       : player.parentId === user.id ||
         player.parentLinks.some((l) => l.parentUserId === user.id));

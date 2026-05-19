@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireFamilyAccess } from "@/lib/tenant";
 import { db } from "@/lib/db";
-import { parentModelV2Enabled } from "@/lib/env";
+import { parentModelV2EnabledFor } from "@/lib/env";
 import { NextSessionHero } from "@/components/family/NextSessionHero";
 import { KidsCarousel } from "@/components/family/KidsCarousel";
 import { OutstandingStrip } from "@/components/family/OutstandingStrip";
@@ -40,7 +40,7 @@ export default async function FamilyHomePage({
   const { tenant, user, parent } = await requireFamilyAccess(slug);
 
   const playerWhere =
-    parentModelV2Enabled() && parent
+    parentModelV2EnabledFor(tenant.slug) && parent
       ? { tenantId: tenant.id, parentRefId: parent.id }
       : {
           tenantId: tenant.id,
@@ -56,7 +56,7 @@ export default async function FamilyHomePage({
   });
 
   const [familyEvents, invoices, pendingWaivers] = await Promise.all([
-    loadUpcomingFamilyEvents(tenant.id, user.id, { limit: 50, parent }),
+    loadUpcomingFamilyEvents(tenant.id, user.id, { limit: 50, parent, tenantSlug: tenant.slug }),
     db.invoice.findMany({
       where: { tenantId: tenant.id, payerEmail: user.email ?? "@@none@@" },
       orderBy: { createdAt: "desc" },

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireFamilyAccess } from "@/lib/tenant";
 import { db } from "@/lib/db";
-import { parentModelV2Enabled } from "@/lib/env";
+import { parentModelV2EnabledFor } from "@/lib/env";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -27,7 +27,7 @@ export default async function FamilyKidsListPage({
   const { tenant, user, parent } = await requireFamilyAccess(slug);
 
   const playerWhere =
-    parentModelV2Enabled() && parent
+    parentModelV2EnabledFor(tenant.slug) && parent
       ? { tenantId: tenant.id, parentRefId: parent.id }
       : {
           tenantId: tenant.id,

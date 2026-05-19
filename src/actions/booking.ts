@@ -4,7 +4,7 @@ import { z } from "zod";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
-import { parentModelV2Enabled, parentModelV2Shadow } from "@/lib/env";
+import { parentModelV2EnabledFor, parentModelV2ShadowFor } from "@/lib/env";
 import { sendBookingConfirmation } from "@/lib/email";
 import { stripeEnabled, getStripe } from "@/lib/stripe";
 import { normalizeEmail, normalizePhone, matchParent } from "@/lib/parent-link";
@@ -76,7 +76,7 @@ export async function createBookingAction(input: BookingInput) {
   // upsert are skipped entirely and Player.parentRefId becomes the source of
   // truth for parent identity on this booking.
   let parentRefId: string | null = null;
-  if (parentModelV2Shadow()) {
+  if (parentModelV2ShadowFor(tenant.slug)) {
     const result = await findOrCreateParent(db, {
       tenantId: tenant.id,
       email: parentEmail,
@@ -100,7 +100,7 @@ export async function createBookingAction(input: BookingInput) {
   }
 
   let parentUser: { id: string; email: string | null; phone: string | null; name: string | null } | null = null;
-  if (!parentModelV2Enabled()) {
+  if (!parentModelV2EnabledFor(tenant.slug)) {
     const emailMatch = await db.user.findUnique({ where: { email: parentEmail } });
     if (emailMatch) {
       parentUser = await db.user.update({
@@ -313,7 +313,7 @@ export async function createBookingAction(input: BookingInput) {
   // already authenticates the parent identity, so there is nothing to
   // claim.
   let claimUrl: string | undefined;
-  if (parentModelV2Shadow() && parentRefId) {
+  if (parentModelV2ShadowFor(tenant.slug) && parentRefId) {
     const parentRow = await db.parent.findUniqueOrThrow({
       where: { id: parentRefId },
     });

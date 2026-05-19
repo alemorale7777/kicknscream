@@ -2,7 +2,7 @@ import { cache } from "react";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { parentModelV2Enabled } from "@/lib/env";
+import { parentModelV2EnabledFor } from "@/lib/env";
 import type { Membership, Parent, Tenant, TenantParent, User } from "@prisma/client";
 
 export { hasRole, canManageTenant, roleLabel } from "./roles";
@@ -125,7 +125,7 @@ export type FamilyAccess = {
 };
 
 export async function requireFamilyAccess(slug: string): Promise<FamilyAccess> {
-  if (parentModelV2Enabled()) {
+  if (parentModelV2EnabledFor(slug)) {
     const acc = await requireParentAccess(slug);
     return {
       tenant: acc.tenant,
